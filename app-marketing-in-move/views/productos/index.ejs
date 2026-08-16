@@ -1,0 +1,32 @@
+<%- include('../partials/header') %>
+
+<h1>Productos</h1>
+<p class="muted">Elegí un producto para entrar a su espacio de trabajo. Perfil, plan y contenido quedan aislados por producto.</p>
+
+<div class="card-grid">
+  <% productos.forEach(function (p) { %>
+    <a class="card" href="/productos/<%= p.slug %>/perfil">
+      <h2><%= p.nombre %></h2>
+      <% if (p.estado_perfil) { %>
+        <span class="badge badge-<%= p.estado_perfil %>">
+          <%= p.estado_perfil === 'aprobado' ? 'Perfil aprobado' : 'Perfil en borrador' %>
+        </span>
+      <% } else { %>
+        <span class="badge badge-vacio">Sin perfil todavía</span>
+      <% } %>
+      <p class="muted small"><%= p.total_versiones %> versión(es)</p>
+    </a>
+  <% }); %>
+</div>
+
+<h2 class="section-title">Agregar producto nuevo</h2>
+<form method="POST" action="/productos" class="inline-form">
+  <input type="text" name="nombre" placeholder="Nombre del producto (ej: In Move Readiness)" required>
+  <button type="submit">Crear</button>
+</form>
+<p class="muted small">
+  Un producto nuevo arranca vacío: antes de poder hacer cualquier otra cosa hay que
+  completar y aprobar su perfil de producto.
+</p>
+
+<%- include('../partials/footer') %>

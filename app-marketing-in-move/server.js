@@ -1,0 +1,53 @@
+require('dotenv').config();
+
+const express = require('express');
+const path = require('path');
+const basicAuth = require('express-basic-auth');
+
+const initDb = require('./db/init');
+const productosRouter = require('./routes/productos');
+const perfilesRouter = require('./routes/perfiles');
+
+const app = express();
+
+app.set('view engine', 'ejs');
+app.set('views', path.join(__dirname, 'views'));
+app.use(express.urlencoded({ extended: true }));
+app.use(express.static(path.join(__dirname, 'public')));
+
+// Proteccion opcional con usuario/contrasena. Se activa solo si ambas variables
+// de entorno estan definidas (ver README para configurarlas en Render).
+if (process.env.APP_USER && process.env.APP_PASSWORD) {
+  app.use(
+    basicAuth({
+      users: { [process.env.APP_USER]: process.env.APP_PASSWORD },
+      challenge: true,
+    })
+  );
+}
+
+app.use('/', productosRouter);
+app.use('/productos/:slug/perfil', perfilesRouter);
+
+app.use((req, res) => {
+  res.status(404).send('No encontrado.');
+});
+
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, next) => {
+  console.error(err);
+  res.status(500).send('Error interno. Revisa los logs del servicio en Render.');
+});
+
+const PORT = process.env.PORT || 3000;
+
+initDb()
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`In Move Marketing corriendo en el puerto ${PORT}`);
+    });
+  })
+  .catch((err) => {
+    console.error('No se pudo inicializar la base de datos:', err);
+    process.exit(1);
+  });

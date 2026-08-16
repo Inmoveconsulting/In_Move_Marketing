@@ -1,0 +1,19 @@
+{
+  "name": "in-move-marketing",
+  "version": "1.0.0",
+  "private": true,
+  "description": "App de marketing interna de In Move Consulting. Independiente de la app operativa de seleccion (in-move-talent-1).",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "ejs": "^3.1.10",
+    "express": "^4.19.2",
+    "express-basic-auth": "^1.2.1",
+    "pg": "^8.12.0"
+  }
+}

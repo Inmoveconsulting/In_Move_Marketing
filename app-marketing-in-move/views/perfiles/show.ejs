@@ -1,0 +1,77 @@
+<%- include('../partials/header') %>
+
+<div class="perfil-header">
+  <div>
+    <h1>Perfil de producto</h1>
+    <% if (perfil) { %>
+      <span class="badge badge-<%= perfil.estado %>"><%= perfil.estado === 'aprobado' ? 'Aprobado' : 'Borrador' %></span>
+      <span class="version-tag">v<%= perfil.version %></span>
+      <% if (esHistorico) { %>
+        <span class="badge badge-vacio">versión histórica</span>
+      <% } %>
+    <% } else { %>
+      <span class="badge badge-vacio">Sin crear todavía</span>
+    <% } %>
+  </div>
+  <div class="perfil-actions">
+    <a href="/productos/<%= producto.slug %>/perfil/historial">Ver historial<% if (totalVersiones) { %> (<%= totalVersiones %>)<% } %></a>
+  </div>
+</div>
+
+<% if (esNuevo && puedeSeedTalent) { %>
+  <form method="POST" action="/productos/<%= producto.slug %>/perfil/seed-ejemplo" class="callout">
+    <p>
+      Todavía no hay perfil para este producto. Podés completarlo a mano abajo, o cargar el
+      perfil real ya aprobado de In Move Talent (v1.1) para probar la pantalla con datos reales.
+    </p>
+    <button type="submit">Cargar datos de ejemplo de In Move Talent</button>
+  </form>
+<% } %>
+
+<% if (esNuevo && !puedeSeedTalent) { %>
+  <p class="callout">Todavía no hay perfil para este producto. Completá los campos y guardá el borrador.</p>
+<% } %>
+
+<form method="POST" action="/productos/<%= producto.slug %>/perfil">
+  <%
+    const campos = [
+      ['identidad', 'Identidad y propósito', 'Producto, tagline, propósito, diferencial, cómo funciona, garantía, datos oficiales a usar (y a no repetir mal).'],
+      ['publico_objetivo', 'Público objetivo', 'A quién le hablamos, quién decide la compra o contratación.'],
+      ['dolor_solucion', 'Dolor y solución', 'El problema real que resolvemos, su costo, y la promesa de solución (no solo el dolor).'],
+      ['objetivo_crecimiento', 'Objetivo de crecimiento', 'Qué buscamos con el contenido: ¿top of mind, conversión, otro? Plazo y cómo se mide.'],
+      ['tono_voz', 'Tono de voz y estilo', 'Cómo suena la marca. Qué evitar. Vocabulario permitido y prohibido.'],
+      ['frases_guia', 'Frases y conceptos guía', 'Tagline, frases ya validadas, frameworks de contenido propios.'],
+      ['ejemplos_referencia', 'Ejemplos de referencia', 'Casos con resultado medible, contenido ya publicado en el mismo ángulo, pruebas de producto.'],
+      ['ctas_por_etapa', 'CTAs por etapa', 'Los llamados a la acción disponibles y cuándo usar cada uno según la etapa del funnel.'],
+    ];
+  %>
+
+  <% campos.forEach(function (c) { %>
+    <div class="field">
+      <label for="<%= c[0] %>"><%= c[1] %></label>
+      <p class="field-help"><%= c[2] %></p>
+      <% if (readonly) { %>
+        <div class="field-readonly"><%= (perfil && perfil[c[0]]) || '—' %></div>
+      <% } else { %>
+        <textarea id="<%= c[0] %>" name="<%= c[0] %>" rows="6"><%= (perfil && perfil[c[0]]) || '' %></textarea>
+      <% } %>
+    </div>
+  <% }); %>
+
+  <% if (!readonly) { %>
+    <div class="form-actions">
+      <button type="submit">Guardar borrador</button>
+      <% if (perfil) { %>
+        <button type="submit" formaction="/productos/<%= producto.slug %>/perfil/aprobar" class="btn-primary">Aprobar</button>
+      <% } %>
+    </div>
+  <% } %>
+</form>
+
+<% if (readonly && !esHistorico) { %>
+  <form method="POST" action="/productos/<%= producto.slug %>/perfil/nueva-version">
+    <button type="submit">Editar (crea versión nueva)</button>
+  </form>
+<% } %>
+
+<%- include('../partials/footer') %>

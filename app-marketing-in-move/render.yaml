@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: in-move-marketing
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: in-move-marketing-db
+          property: connectionString
+      - key: APP_USER
+        sync: false
+      - key: APP_PASSWORD
+        sync: false
+
+databases:
+  - name: in-move-marketing-db
+    plan: free
