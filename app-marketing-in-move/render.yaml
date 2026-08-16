@@ -3,6 +3,7 @@ services:
     name: in-move-marketing
     env: node
     plan: free
+    rootDir: app-marketing-in-move
     buildCommand: npm install
     startCommand: npm start
     envVars:
