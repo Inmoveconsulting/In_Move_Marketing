@@ -33,6 +33,26 @@ body {
   border-bottom: 1px solid var(--border);
 }
 
+.workspace-nav {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+  padding: 10px 24px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+
+.workspace-nav a {
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.workspace-nav a:hover {
+  color: var(--accent);
+}
+
 .brand {
   font-weight: 700;
   color: var(--accent);

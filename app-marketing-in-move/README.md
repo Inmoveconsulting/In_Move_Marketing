@@ -23,23 +23,52 @@ y la **Pantalla 3 — Generación de contenido** (identidad visual + generación
 4. **Calendario (pilares de contenido)** — botón "Generar propuesta con IA" (usa los CTAs ya definidos en el perfil, no inventa nuevos) o carga manual de hasta 6 pilares.
 5. Mismo patrón de estado/versión que el perfil. Guarda `perfil_producto_id`: a qué versión exacta del perfil está atado.
 
-**Identidad visual** (requiere un perfil aprobado):
-1. Subís hasta 3 archivos de referencia de marca: **logo** (obligatorio) y hasta 2 imágenes que representen el estilo que buscás — fotos o piezas que ya te gusten, no algo generado. Cualquier formato (SVG incluido) se convierte solo a PNG.
-2. La pantalla indica qué buscar en una buena referencia: zona de fondo liso para poner texto encima, tono coherente con la marca, formato cuadrado.
-3. **"Aprobar identidad visual"** — congela esa versión como la referencia de marca aprobada. Mismo patrón de estado/versión que el resto.
+La generación de imágenes pasó por tres versiones hasta llegar a la actual — vale la pena
+saber por qué, si en algún momento se vuelve a tocar esta parte:
+1. Generar una "imagen de prueba" para aprobar como plantilla fija (estilos preseteados,
+   regenerar hasta aprobar) — el resultado no convencía y salía caro por intento.
+2. Nada de IA: reusar tal cual, rotando, las fotos de referencia subidas — pero eso
+   significaba salir a buscar fotos a mano y esperar que combinen bien con el texto, que
+   es justo el trabajo manual que se quería automatizar.
+3. **La actual:** la IA genera un fondo nuevo por cada pieza (no hay que buscar fotos),
+   guiada por 2 referencias de estilo; el texto y el logo se agregan aparte, con código
+   (nunca se los pedimos a la IA de imagen — el texto que dibuja un modelo de imagen suele
+   salir mal escrito).
 
-*(Se probó primero generar la imagen con IA — OpenAI `gpt-image-1`, con estilos, prompt editable y regeneración — pero el resultado no convencía y salía caro por intento. Se volvió a este flujo más simple y sin costo. El código de esa prueba queda en `lib/openaiImagenes.js`, sin uso activo, por si se retoma más adelante para la generación real de piezas.)*
+**Identidad visual** (requiere un perfil aprobado; no genera nada, solo define la base):
+1. **Logo — opcional.** Si no subís uno, las imágenes se generan sin logo.
+2. **2 imágenes de referencia** — que representen el estilo visual que te gusta. Sirven de
+   guía para la IA, no van a aparecer tal cual en el resultado final. Cualquier formato
+   (SVG incluido) se convierte solo a PNG.
+3. **Prompt de imagen editable**, con un mensaje claro: "esto es lo que se le manda a la
+   IA para generar el fondo de cada pieza, podés modificarlo agregando o quitando
+   instrucciones". Arranca con una base por defecto (tono de marca + reglas para evitar el
+   look de foto stock genérica), vos la ajustás.
+4. **"Aprobar identidad visual"** — congela esa versión. Mismo patrón de estado/versión
+   que el resto.
 
 **Contenido** (requiere un plan aprobado — si no hay ninguno, te manda de vuelta a la Pantalla 2):
-1. Se genera **por semana, no el plan completo de una** (regla de la spec). Cada semana usa un pilar de contenido distinto — rotan sobre los pilares del calendario del plan (semana 1 usa el primero, semana 2 el segundo, y si hay más semanas que pilares vuelve a empezar).
-2. Botón **"Generar semana N"** — un disparo de IA por pieza (una por cada vez/semana de cada canal del plan), con el perfil + la fila del calendario correspondiente como contexto, como pide la spec. Si algo falla a mitad de camino, tocar el botón de nuevo solo completa lo que falta, no duplica lo ya generado.
-3. Cada pieza tiene su **copy editable** (o "Regenerar copy" para pedirle a la IA que lo reescriba).
-4. **Imagen por pieza — botón "Crear imagen":** compone la imagen con código, no con un modelo de IA de imagen — fondo (una referencia de identidad visual) + un titular corto superpuesto + el logo. El titular lo escribe la IA a partir del copy (o lo escribís vos en el campo, y lo usa tal cual). "Regenerar imagen" prueba otro fondo y otro titular; "O subir la mía" reemplaza todo por un archivo propio. El texto se dibuja con `@resvg/resvg-js` cargando la tipografía Inter directo del archivo (`assets/fonts/`) — así sale siempre nítido y bien escrito, a diferencia de pedirle texto a un modelo de imagen.
-5. Todo queda en estado **"borrador"** — la cola de aprobación (Pantalla 4) todavía no existe, así que por ahora se edita directo acá.
+1. **Paso 1 — copys.** Se genera **por semana, no el plan completo de una** (regla de la
+   spec). Cada semana usa un pilar de contenido distinto — rotan sobre los pilares del
+   calendario del plan. Botón **"Generar semana N"** — un disparo de IA por pieza (una por
+   cada vez/semana de cada canal), con el perfil + la fila del calendario correspondiente
+   como contexto. Si algo falla a mitad de camino, tocar el botón de nuevo solo completa
+   lo que falta.
+2. Cada copy es **editable**, o **"Regenerar copy"** para pedirle a la IA que lo reescriba.
+3. **Paso 2 — imágenes**, recién disponible con los copys ya creados. Botón **"Crear
+   imágenes de la semana N"** — genera el fondo de cada pieza con OpenAI (`gpt-image-1`,
+   usando el prompt + referencias de Identidad visual) y le compone encima un titular
+   corto (lo escribe la IA a partir del copy, o lo escribís vos) + el logo. El texto se
+   dibuja con `@resvg/resvg-js` cargando la tipografía Inter directo del archivo
+   (`assets/fonts/`), no con el modelo de imagen. **Las piezas de Email no llevan imagen.**
+4. Por pieza: **"Regenerar imagen"** prueba un fondo y un titular nuevos; **"O subir la
+   mía"** reemplaza todo por un archivo propio.
+5. Todo queda en estado **"borrador"** — la cola de aprobación (Pantalla 4) todavía no
+   existe, así que por ahora se edita directo acá.
 
 Las sugerencias de IA son eso — sugerencias. Todo queda como borrador editable y nada se aprueba solo; vos revisás y aprobás cada paso, como pide la spec.
 
-Generación de copys + imágenes por pieza, cola de aprobación, publicación y medición (el resto de la Pantalla 3 y las pantallas 4 a 6) **todavía no están construidas**. El modelo de datos ya tiene la tabla `contenido_generado` creada desde ahora, para que cuando se construya esa parte no haga falta una migración.
+Cola de aprobación, publicación y medición (pantallas 4 a 6) **todavía no están construidas**.
 
 ## Stack (por qué esto y no otra cosa)
 
@@ -67,7 +96,7 @@ app-marketing-in-move/
   lib/claude.js            cliente minimo de la API de Claude (sin SDK, un fetch)
   lib/sugerenciasIA.js     prompts de IA: duración/canales/calendario (pantalla 2), copy y titular de imagen (pantalla 3)
   lib/imagenPieza.js       compone la imagen de cada pieza: fondo + titular + logo, con código (sin IA de imagen)
-  lib/openaiImagenes.js    cliente de imágenes de OpenAI — sin uso activo (ver Identidad visual)
+  lib/openaiImagenes.js    cliente de la API de imágenes de OpenAI (gpt-image-1) — genera el fondo de cada pieza
   assets/fonts/            tipografía (Inter, licencia OFL) para dibujar texto sobre las imágenes
   views/                   plantillas EJS
   public/style.css         estilos
@@ -87,16 +116,18 @@ obligatorio: no puede existir un plan sin decir qué versión exacta de qué per
 objetivo, duración (+ razón), canales (+ razón) y calendario de pilares — todo editable hasta
 que se aprueba.
 
-**identidad_visual** — mismo patrón de versión/estado. Guarda logo + hasta 2 referencias
-(como data URI base64 — a esta escala no justifica un storage externo tipo S3), el estilo
-elegido, y la imagen de prueba generada (se sobreescribe en cada regeneración mientras está
-en borrador). `intentos` cuenta cuántas veces se regeneró, solo informativo.
+**identidad_visual** — mismo patrón de versión/estado. Guarda logo (opcional) + hasta 2
+referencias de estilo (como data URI base64 — a esta escala no justifica un storage
+externo tipo S3) + `prompt_imagen`, el prompt editable que usa cada pieza de Contenido
+para generar su fondo. No genera ninguna imagen en esta pantalla — solo define la base.
 
-**contenido_generado** — cada pieza referencia el plan y la versión de perfil que la generó,
-más `semana` (el tramo al que pertenece) y `pilar` (cuál usó). Estado (`borrador` → ... →
-`publicado`) y `version_origen_id` para cuando una pieza se regenera por feedback — hoy
-regenerar pisa el copy en el lugar porque todavía no hay cola de aprobación que proteja
-versiones anteriores; cuando se construya la Pantalla 4 esto pasa a versionar de verdad.
+**contenido_generado** — cada pieza referencia el plan y la versión de perfil que la
+generó, más `semana` (el tramo al que pertenece) y `pilar` (cuál usó). `texto_imagen` es
+el titular corto compuesto sobre la imagen (distinto de `copy`, el texto completo del
+posteo). Estado (`borrador` → ... → `publicado`) y `version_origen_id` para cuando una
+pieza se regenera por feedback — hoy regenerar pisa el copy/imagen en el lugar porque
+todavía no hay cola de aprobación que proteja versiones anteriores; cuando se construya
+la Pantalla 4 esto pasa a versionar de verdad.
 
 Este esqueleto ya cubre la trazabilidad completa que pide la spec: "todo objeto lleva versión
 y trazabilidad de qué versión de qué otro objeto lo originó".
@@ -181,12 +212,22 @@ volumen de esta app — cada sugerencia es una sola llamada corta).
 Variable opcional: `CLAUDE_MODEL` (por defecto usa `claude-sonnet-5`) si en algún momento
 querés apuntar a otro modelo.
 
-### API key de OpenAI (no necesaria por ahora)
+### API key de OpenAI (necesaria para crear imágenes en Contenido)
 
-La Pantalla de Identidad visual no usa IA de imágenes — se suben referencias directo (ver
-más arriba por qué). `OPENAI_API_KEY` no hace falta hoy; queda documentada acá por si en
-el futuro se retoma la generación de imágenes para piezas reales (`lib/openaiImagenes.js`).
-Si ya la cargaste en Render, no molesta dejarla — simplemente no se usa todavía.
+La Pantalla de Contenido usa la API de imágenes de OpenAI (`gpt-image-1`) para generar el
+fondo de cada pieza — cuenta y facturación separadas de Anthropic.
+
+Sin esto, todo lo demás funciona igual (copys, identidad visual), pero el botón "Crear
+imágenes" no va a andar.
+
+1. Andá a [platform.openai.com](https://platform.openai.com), entrá con tu cuenta (o creá
+   una) y generá una API key nueva (sección "API keys").
+2. Puede que te pida cargar un medio de pago antes de dejarte usar la API de imágenes —
+   es una cuenta de pago por uso, separada de todo lo demás.
+3. En Render, entrá al servicio `in-move-marketing` → pestaña **Environment**.
+4. Agregá la variable `OPENAI_API_KEY` con el valor que copiaste (si ya la habías cargado
+   antes, no hace falta hacer nada).
+5. Guardá — redespliega solo.
 
 ## Cómo actualizar la app en el futuro (mismo mecanismo que ya usás)
 
@@ -239,18 +280,20 @@ Cuando te dé archivos nuevos o modificados:
 
 ## Cómo probar Identidad visual con datos reales
 
-1. Con el perfil de In Move Talent aprobado, entrá a "In Move Talent" y tocá **"Ir a
-   identidad visual →"** (junto a "Ver historial" en la Pantalla 1).
-2. Subí el logo de In Move (obligatorio).
-3. Subí 1 o 2 imágenes que ya te gusten como referencia de estilo — de la landing, de la
-   demo, o de cualquier lado — siguiendo la guía que aparece en pantalla (fondo liso para
-   texto, tono coherente, formato cuadrado).
-4. Guardá borrador, revisalo, y **"Aprobar identidad visual"**.
+1. Con el perfil de In Move Talent aprobado, entrá a "In Move Talent" y tocá **"Identidad
+   visual"** en el menú de arriba (ahora disponible en las 4 pantallas, no hace falta ir
+   navegando de a una).
+2. Subí el logo de In Move (opcional).
+3. Subí 1 o 2 imágenes que representen el estilo que te gusta — no hace falta que sean
+   perfectas, son guía, no el resultado final.
+4. Revisá el prompt de imagen que aparece por defecto — ajustalo si querés (mood, colores,
+   qué evitar).
+5. Guardá borrador, revisalo, y **"Aprobar identidad visual"**.
 
 ## Cómo probar Contenido con datos reales
 
-1. Con el plan de In Move Talent aprobado, entrá a "In Move Talent" y tocá **"Ir a
-   contenido →"** (junto a "Ver historial" en la Pantalla 2).
+1. Con el plan de In Move Talent aprobado, entrá a "In Move Talent" y tocá **"Contenido"**
+   en el menú de arriba.
 2. Vas a ver una sección por cada semana del plan (90 días = 13 semanas), cada una con su
    pilar de contenido.
 3. Tocá **"Generar semana 1"** — tarda unos segundos (una llamada a Claude por cada pieza:
@@ -258,12 +301,14 @@ Cuando te dé archivos nuevos o modificados:
    contra el pilar y el tono del perfil.
 4. Si alguna no te convence, **"Regenerar copy"** esa sola, o editala directo en el
    textarea y **"Guardar copy"**.
-5. Con la identidad visual de In Move Talent aprobada (con al menos una referencia
-   subida), tocá **"Crear imagen"** en alguna pieza — deberías ver el fondo con un
-   titular corto superpuesto y el logo en la esquina. Probá **"Regenerar imagen"** para
-   ver otra combinación, y escribir tu propio titular en el campo antes de generar para
+5. Con Identidad visual aprobada, tocá **"Crear imágenes de la semana 1"** — genera el
+   fondo con OpenAI para cada pieza que no sea Email, y le compone el titular + logo
+   encima. Tarda más que los copys (una llamada a OpenAI por pieza).
+6. Si alguna no te convence, **"Regenerar imagen"** esa sola — prueba un fondo y un
+   titular nuevos. Escribí tu propio titular en el campo antes de tocar el botón para
    confirmar que lo respeta en vez de inventar uno.
-6. Repetí con la semana 2 para confirmar que rota al segundo pilar del calendario.
+7. Confirmá que las piezas de Email no muestran ninguna opción de imagen.
+8. Repetí con la semana 2 para confirmar que rota al segundo pilar del calendario.
 
 ## Qué sigue (no construido todavía)
 

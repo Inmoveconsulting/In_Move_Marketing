@@ -15,4 +15,12 @@
       <span class="topbar-producto"><%= producto.nombre %></span>
     <% } %>
   </header>
+  <% if (typeof producto !== 'undefined' && producto) { %>
+    <nav class="workspace-nav">
+      <a href="/productos/<%= producto.slug %>/perfil">Perfil</a>
+      <a href="/productos/<%= producto.slug %>/plan">Plan</a>
+      <a href="/productos/<%= producto.slug %>/identidad-visual">Identidad visual</a>
+      <a href="/productos/<%= producto.slug %>/contenido">Contenido</a>
+    </nav>
+  <% } %>
   <main class="container">

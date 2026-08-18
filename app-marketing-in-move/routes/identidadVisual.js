@@ -9,13 +9,11 @@ const {
   getIdentidadVisualVersiones,
 } = require('../lib/queries');
 
-// Paso previo de la Pantalla 3 (spec sección 3): definir la identidad visual de marca
-// antes de generar copys + imágenes por pieza. En vez de generar imágenes de prueba con
-// IA (probado y descartado: salía caro y el resultado no convencía), acá se suben
-// directamente imágenes de referencia que la usuaria ya sabe que funcionan — más simple,
-// sin costo, y con control total sobre el resultado. Estas referencias son las que se
-// van a usar más adelante como guía cuando se generen piezas reales. Mismo patrón de
-// version/estado que el resto. Requiere un perfil aprobado (misma regla que el plan).
+// Identidad visual (dentro de la Pantalla 3): logo (opcional) + hasta 2 imágenes de
+// estilo que sirven de guía visual + un prompt de imagen editable — esto es lo que
+// después usa cada pieza de Contenido para pedirle a la IA de imágenes (OpenAI) que
+// genere su fondo. Nada se genera acá — esta pantalla solo define la base. Mismo patrón
+// de version/estado que el resto. Requiere un perfil aprobado.
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -47,6 +45,24 @@ async function archivoADataUri(file) {
   } catch (e) {
     throw new Error(`No se pudo procesar el archivo "${file.originalname}": ${e.message}`);
   }
+}
+
+// Prompt de base por defecto — sin llamar a la IA, así el campo nunca arranca vacío. Ya
+// incluye las reglas anti-cliché aprendidas en la práctica (evitar el look de foto stock
+// corporativa genérica). Se genera una sola vez; si ya hay un prompt guardado no se pisa.
+function promptBase(perfil) {
+  return `
+Fotografía para contenido de marketing B2B de esta marca.
+
+Tono de marca: ${perfil.tono_voz}
+
+Evitá la estética de foto stock genérica de "reunión corporativa" (gente sonriendo
+mirando a cámara, poses artificiales). Buscá un momento natural de trabajo real: alguien
+mirando una pantalla con datos, señalando algo concreto en un documento o dashboard.
+
+Dejá una zona de fondo liso o de bajo contraste en la parte superior, para poder
+superponer un título después — no la llenes de detalle. Formato cuadrado, alta calidad.
+`.trim();
 }
 
 router.use(async (req, res, next) => {
@@ -81,8 +97,8 @@ router.get('/', async (req, res, next) => {
   }
 });
 
-// Guardar/actualizar logo + referencias + notas. Los archivos son opcionales en una
-// actualización: si no se sube uno nuevo, se conserva el que ya estaba guardado.
+// Guardar/actualizar logo (opcional) + referencias + prompt. Los archivos son opcionales
+// en una actualización: si no se sube uno nuevo, se conserva el que ya estaba guardado.
 router.post('/', camposArchivos, async (req, res, next) => {
   try {
     const perfilAprobado = await getPerfilAprobadoActual(req.producto.id);
@@ -109,22 +125,24 @@ router.post('/', camposArchivos, async (req, res, next) => {
       (await archivoADataUri(archivos.referencia_2 && archivos.referencia_2[0])) ||
       (actual && actual.referencia_2) ||
       null;
-    const notas_estilo = (req.body.notas_estilo || '').trim();
+
+    let prompt_imagen = (req.body.prompt_imagen || '').trim();
+    if (!prompt_imagen) prompt_imagen = promptBase(perfilAprobado);
 
     if (!actual) {
       await pool.query(
         `INSERT INTO identidad_visual
-          (producto_id, version, estado, logo, referencia_1, referencia_2, notas_estilo)
+          (producto_id, version, estado, logo, referencia_1, referencia_2, prompt_imagen)
          VALUES ($1, 1, 'borrador', $2, $3, $4, $5)`,
-        [req.producto.id, logo, referencia_1, referencia_2, notas_estilo]
+        [req.producto.id, logo, referencia_1, referencia_2, prompt_imagen]
       );
     } else {
       await pool.query(
         `UPDATE identidad_visual SET
-           logo = $1, referencia_1 = $2, referencia_2 = $3, notas_estilo = $4,
+           logo = $1, referencia_1 = $2, referencia_2 = $3, prompt_imagen = $4,
            actualizado_en = now()
          WHERE id = $5`,
-        [logo, referencia_1, referencia_2, notas_estilo, actual.id]
+        [logo, referencia_1, referencia_2, prompt_imagen, actual.id]
       );
     }
 
@@ -136,8 +154,8 @@ router.post('/', camposArchivos, async (req, res, next) => {
   }
 });
 
-// Aprobar: guarda los cambios pendientes del formulario (por si se subió un archivo o se
-// editó una nota y se aprobó en el mismo paso, mismo patrón que perfil/plan) y congela.
+// Aprobar: guarda los cambios pendientes del formulario (mismo patrón que perfil/plan) y
+// congela. Logo y referencias son opcionales — no bloquean la aprobación.
 router.post('/aprobar', camposArchivos, async (req, res, next) => {
   try {
     const versiones = await getIdentidadVisualVersiones(req.producto.id);
@@ -156,20 +174,14 @@ router.post('/aprobar', camposArchivos, async (req, res, next) => {
       (await archivoADataUri(archivos.referencia_2 && archivos.referencia_2[0])) ||
       actual.referencia_2 ||
       null;
-    const notas_estilo = (req.body.notas_estilo || '').trim();
-
-    if (!logo) {
-      return res.redirect(
-        `/productos/${req.producto.slug}/identidad-visual?error=${encodeURIComponent('Subí al menos el logo antes de aprobar.')}`
-      );
-    }
+    const prompt_imagen = (req.body.prompt_imagen || '').trim() || actual.prompt_imagen;
 
     await pool.query(
       `UPDATE identidad_visual SET
-         logo = $1, referencia_1 = $2, referencia_2 = $3, notas_estilo = $4,
+         logo = $1, referencia_1 = $2, referencia_2 = $3, prompt_imagen = $4,
          estado = 'aprobado', aprobado_en = now(), actualizado_en = now()
        WHERE id = $5`,
-      [logo, referencia_1, referencia_2, notas_estilo, actual.id]
+      [logo, referencia_1, referencia_2, prompt_imagen, actual.id]
     );
     res.redirect(`/productos/${req.producto.slug}/identidad-visual`);
   } catch (err) {
@@ -190,7 +202,7 @@ router.post('/nueva-version', async (req, res, next) => {
     const nuevaVersion = actual.version + 1;
     await pool.query(
       `INSERT INTO identidad_visual
-        (producto_id, version, estado, logo, referencia_1, referencia_2, notas_estilo, version_origen_id)
+        (producto_id, version, estado, logo, referencia_1, referencia_2, prompt_imagen, version_origen_id)
        VALUES ($1, $2, 'borrador', $3, $4, $5, $6, $7)`,
       [
         req.producto.id,
@@ -198,7 +210,7 @@ router.post('/nueva-version', async (req, res, next) => {
         actual.logo,
         actual.referencia_1,
         actual.referencia_2,
-        actual.notas_estilo,
+        actual.prompt_imagen,
         actual.id,
       ]
     );

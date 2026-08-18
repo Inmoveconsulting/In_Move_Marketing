@@ -10,17 +10,21 @@ const {
   getIdentidadVisualAprobadaActual,
 } = require('../lib/queries');
 const { sugerirCopy, sugerirTextoImagen } = require('../lib/sugerenciasIA');
+const { generarFondoImagen } = require('../lib/openaiImagenes');
 const { crearImagenPieza } = require('../lib/imagenPieza');
 
 // Pantalla 3 — Generación de contenido. Se genera por tramo (semana), no el plan completo
 // de una (regla de la spec). El pilar de cada semana rota sobre el calendario del plan.
 //
-// La imagen de cada pieza se COMPONE con código: un fondo de identidad visual + el titular
-// de esa pieza superpuesto + el logo — no se le pide a un modelo de IA de imagen que la
-// dibuje entera (el texto sobre imagen generado por IA suele salir mal escrito). Se puede
-// crear/regenerar cuantas veces haga falta, o reemplazar por una imagen subida a mano.
-// Cada pieza entra en estado "borrador" — la cola de aprobación (Pantalla 4) todavía no
-// está construida, así que por ahora se puede editar/regenerar acá directo.
+// Proceso de imagen por pieza: la IA de OpenAI genera el FONDO (foto), usando el prompt +
+// las referencias de estilo definidas en Identidad visual — así no hay que salir a buscar
+// fotos a mano. El titular y el logo se agregan aparte, compuestos con código (no se los
+// pedimos a la IA de imagen: el texto que dibuja un modelo de imagen suele salir mal
+// escrito). Las piezas de Email no llevan imagen. Cada pieza entra en estado "borrador" —
+// la cola de aprobación (Pantalla 4) todavía no está construida, así que por ahora se
+// puede editar/regenerar acá directo.
+
+const CANALES_SIN_IMAGEN = ['Email'];
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -59,11 +63,37 @@ function totalPiezasEsperadasPorSemana(canales) {
   return (canales || []).reduce((sum, c) => sum + (c.veces_por_semana || 0), 0);
 }
 
-// Los fondos candidatos para componer imágenes son las referencias de identidad visual
-// (no el logo — el logo se usa aparte, como sello en la esquina, no como fondo).
-function fondosDeIdentidad(identidad) {
+function referenciasDeIdentidad(identidad) {
   if (!identidad) return [];
   return [identidad.referencia_1, identidad.referencia_2].filter(Boolean);
+}
+
+// Arma el fondo (vía OpenAI) + compone el titular y el logo encima (vía código). Si no
+// se pasa un texto explícito, usa el que ya tenía la pieza o le pide uno a la IA.
+async function generarImagenParaPieza({ pieza, plan, perfil, identidad, textoOverride }) {
+  const pilarObj = (plan.calendario || []).find((p) => p.pilar === pieza.pilar) || {
+    pilar: pieza.pilar,
+    descripcion: '',
+  };
+
+  let texto = (textoOverride || pieza.texto_imagen || '').trim();
+  if (!texto) {
+    texto = await sugerirTextoImagen({ perfil, pilar: pilarObj, copy: pieza.copy });
+  }
+
+  const prompt = `
+${identidad.prompt_imagen}
+
+Contexto de esta pieza puntual: pilar de contenido "${pilarObj.pilar}" — ${pilarObj.descripcion}.
+Canal: ${pieza.canal}.
+
+No incluyas texto ni logos en la imagen — eso se agrega aparte. Formato cuadrado.
+`.trim();
+
+  const fondo = await generarFondoImagen({ prompt, referencias: referenciasDeIdentidad(identidad) });
+  const imagen = await crearImagenPieza({ fondoDataUri: fondo, texto, logoDataUri: identidad.logo });
+
+  return { imagen, texto };
 }
 
 router.use(async (req, res, next) => {
@@ -85,7 +115,8 @@ router.get('/', async (req, res, next) => {
         producto: req.producto,
         plan: null,
         semanas: [],
-        hayFondos: false,
+        hayIdentidad: false,
+        canalesSinImagen: CANALES_SIN_IMAGEN,
         error: req.query.error || null,
       });
     }
@@ -97,17 +128,18 @@ router.get('/', async (req, res, next) => {
       [plan.id]
     );
     const identidad = await getIdentidadVisualAprobadaActual(req.producto.id);
-    const hayFondos = fondosDeIdentidad(identidad).length > 0;
 
     const semanas = [];
     for (let n = 1; n <= totalSemanas; n += 1) {
       const piezasSemana = piezas.filter((p) => p.semana === n);
+      const piezasConImagen = piezasSemana.filter((p) => !CANALES_SIN_IMAGEN.includes(p.canal));
       semanas.push({
         numero: n,
         pilar: pilarDeSemana(plan.calendario, n),
         piezas: piezasSemana,
         totalEsperado: totalEsperadoPorSemana,
         completa: totalEsperadoPorSemana > 0 && piezasSemana.length >= totalEsperadoPorSemana,
+        faltanImagenes: piezasConImagen.some((p) => !p.imagen_ref),
       });
     }
 
@@ -115,7 +147,8 @@ router.get('/', async (req, res, next) => {
       producto: req.producto,
       plan,
       semanas,
-      hayFondos,
+      hayIdentidad: !!identidad,
+      canalesSinImagen: CANALES_SIN_IMAGEN,
       error: req.query.error || null,
     });
   } catch (err) {
@@ -123,11 +156,9 @@ router.get('/', async (req, res, next) => {
   }
 });
 
-// Generar (o completar) las piezas de una semana: un disparo de IA por pieza, con el
+// Generar (o completar) los copys de una semana: un disparo de IA por pieza, con el
 // perfil + la fila del calendario correspondiente + el canal como contexto (regla de la
-// spec). Si ya hay piezas de esa semana, solo genera las que falten por canal — así una
-// falla parcial se puede resolver tocando el mismo botón de nuevo. La imagen de cada
-// pieza se crea aparte, con el botón "Crear imagen" de cada tarjeta.
+// spec). Si ya hay piezas de esa semana, solo genera las que falten por canal.
 router.post('/generar-semana', async (req, res, next) => {
   try {
     const plan = await getPlanAprobadoActual(req.producto.id);
@@ -193,7 +224,7 @@ router.post('/generar-semana', async (req, res, next) => {
 
     if (fallos > 0) {
       return res.redirect(
-        `/productos/${req.producto.slug}/contenido?error=${encodeURIComponent(`Se generaron ${tareas.length - fallos} de ${tareas.length} piezas. Tocá "Generar" de nuevo para completar las que faltaron.`)}`
+        `/productos/${req.producto.slug}/contenido?error=${encodeURIComponent(`Se generaron ${tareas.length - fallos} de ${tareas.length} copys. Tocá "Generar" de nuevo para completar los que faltaron.`)}`
       );
     }
 
@@ -201,6 +232,62 @@ router.post('/generar-semana', async (req, res, next) => {
   } catch (err) {
     res.redirect(
       `/productos/${req.producto.slug}/contenido?error=${encodeURIComponent('No se pudo generar la semana: ' + err.message)}`
+    );
+  }
+});
+
+// Crear las imágenes de todas las piezas de una semana que todavía no tienen una (salta
+// las de Email). Segunda llamada, después de que ya existan los copys.
+router.post('/generar-imagenes-semana', async (req, res, next) => {
+  try {
+    const plan = await getPlanAprobadoActual(req.producto.id);
+    if (!plan) return res.redirect(`/productos/${req.producto.slug}/contenido`);
+
+    const numero = parseInt(req.body.numero, 10);
+    const identidad = await getIdentidadVisualAprobadaActual(req.producto.id);
+    if (!identidad) {
+      return res.redirect(
+        `/productos/${req.producto.slug}/contenido?error=${encodeURIComponent('Necesitás aprobar Identidad visual antes de crear imágenes.')}`
+      );
+    }
+
+    const { rows: piezas } = await pool.query(
+      'SELECT * FROM contenido_generado WHERE plan_marketing_id = $1 AND semana = $2',
+      [plan.id, numero]
+    );
+    const pendientes = piezas.filter((p) => !CANALES_SIN_IMAGEN.includes(p.canal) && !p.imagen_ref);
+    if (pendientes.length === 0) {
+      return res.redirect(`/productos/${req.producto.slug}/contenido`);
+    }
+
+    const perfil = await getPerfilPorId(plan.perfil_producto_id);
+    const resultados = await Promise.allSettled(
+      pendientes.map((pieza) => generarImagenParaPieza({ pieza, plan, perfil, identidad }))
+    );
+
+    let fallos = 0;
+    for (let i = 0; i < resultados.length; i += 1) {
+      const r = resultados[i];
+      if (r.status === 'fulfilled') {
+        await pool.query(
+          'UPDATE contenido_generado SET imagen_ref = $1, texto_imagen = $2, actualizado_en = now() WHERE id = $3',
+          [r.value.imagen, r.value.texto, pendientes[i].id]
+        );
+      } else {
+        fallos += 1;
+      }
+    }
+
+    if (fallos > 0) {
+      return res.redirect(
+        `/productos/${req.producto.slug}/contenido?error=${encodeURIComponent(`Se crearon ${pendientes.length - fallos} de ${pendientes.length} imágenes. Tocá "Crear imágenes" de nuevo para completar las que faltaron.`)}`
+      );
+    }
+
+    res.redirect(`/productos/${req.producto.slug}/contenido`);
+  } catch (err) {
+    res.redirect(
+      `/productos/${req.producto.slug}/contenido?error=${encodeURIComponent('No se pudieron crear las imágenes: ' + err.message)}`
     );
   }
 });
@@ -255,44 +342,37 @@ router.post('/pieza/:id/regenerar', async (req, res, next) => {
   }
 });
 
-// Crear (o regenerar) la imagen de una pieza: fondo de identidad visual + titular +
-// logo, compuestos con código. Si el formulario trae un texto ya escrito, se usa tal
-// cual (no llama a la IA); si viene vacío, la IA escribe un titular breve a partir del
-// copy de la pieza. El fondo se elige al azar entre las referencias disponibles, así que
-// tocar el botón de nuevo es la forma de "no me gusta, probá otra".
+// Crear (o regenerar) la imagen de una sola pieza. Si el formulario trae un titular ya
+// escrito, se usa tal cual; si viene vacío, la IA escribe uno a partir del copy. El fondo
+// se genera de nuevo con OpenAI cada vez, así que tocar el botón de nuevo es la forma de
+// "no me gusta, probá otra".
 router.post('/pieza/:id/imagen-ia', async (req, res, next) => {
   try {
     const { rows } = await pool.query('SELECT * FROM contenido_generado WHERE id = $1', [req.params.id]);
     const pieza = rows[0];
-    if (!pieza) return res.redirect(`/productos/${req.producto.slug}/contenido`);
+    if (!pieza || CANALES_SIN_IMAGEN.includes(pieza.canal)) {
+      return res.redirect(`/productos/${req.producto.slug}/contenido`);
+    }
 
     const identidad = await getIdentidadVisualAprobadaActual(req.producto.id);
-    const fondos = fondosDeIdentidad(identidad);
-    if (fondos.length === 0) {
+    if (!identidad) {
       return res.redirect(
-        `/productos/${req.producto.slug}/contenido?error=${encodeURIComponent('Subí al menos una imagen de referencia en Identidad visual antes de crear imágenes.')}`
+        `/productos/${req.producto.slug}/contenido?error=${encodeURIComponent('Necesitás aprobar Identidad visual antes de crear imágenes.')}`
       );
     }
 
-    let texto = (req.body.texto_imagen || '').trim();
-    if (!texto) {
-      const { rows: planRows } = await pool.query('SELECT * FROM planes_marketing WHERE id = $1', [
-        pieza.plan_marketing_id,
-      ]);
-      const plan = planRows[0];
-      const perfil = await getPerfilPorId(pieza.perfil_producto_id);
-      const pilarObj = (plan.calendario || []).find((p) => p.pilar === pieza.pilar) || {
-        pilar: pieza.pilar,
-        descripcion: '',
-      };
-      texto = await sugerirTextoImagen({ perfil, pilar: pilarObj, copy: pieza.copy });
-    }
+    const { rows: planRows } = await pool.query('SELECT * FROM planes_marketing WHERE id = $1', [
+      pieza.plan_marketing_id,
+    ]);
+    const plan = planRows[0];
+    const perfil = await getPerfilPorId(pieza.perfil_producto_id);
 
-    const fondoElegido = fondos[Math.floor(Math.random() * fondos.length)];
-    const imagen = await crearImagenPieza({
-      fondoDataUri: fondoElegido,
-      texto,
-      logoDataUri: identidad.logo,
+    const { imagen, texto } = await generarImagenParaPieza({
+      pieza,
+      plan,
+      perfil,
+      identidad,
+      textoOverride: (req.body.texto_imagen || '').trim(),
     });
 
     await pool.query(
@@ -307,7 +387,7 @@ router.post('/pieza/:id/imagen-ia', async (req, res, next) => {
   }
 });
 
-// Subir/reemplazar la imagen de una pieza a mano (alternativa a la compuesta con IA).
+// Subir/reemplazar la imagen de una pieza a mano (alternativa a la generada con IA).
 router.post('/pieza/:id/imagen', upload.single('imagen'), async (req, res, next) => {
   try {
     const dataUri = await archivoADataUri(req.file);

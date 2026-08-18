@@ -1,17 +1,13 @@
 // Cliente minimo para la API de imagenes de OpenAI (gpt-image-1). Sin SDK, un solo fetch
 // con FormData nativo de Node — igual filosofia que lib/claude.js.
 //
-// SIN USO ACTIVO por ahora: se probo para generar la imagen de prueba de "Identidad
-// visual" pero el resultado no convencia y salia caro (ver nota en db/schema.sql). Se
-// volvio a un flujo de subir referencias directo. Se deja el archivo por si se retoma
-// mas adelante para la generacion real de piezas (Pantalla 3).
+// Genera el FONDO (foto) de cada pieza de contenido, usando como guía las imágenes de
+// estilo que se subieron en Identidad visual (si hay). El texto y el logo NO se le piden
+// a este modelo — eso se compone aparte con código (ver lib/imagenPieza.js), porque un
+// modelo de imagen escribiendo texto suele salir mal. Esto es solo la foto de fondo.
 //
 // Requiere la variable de entorno OPENAI_API_KEY (se configura en Render). Distinta de
 // ANTHROPIC_API_KEY: es otra cuenta, de platform.openai.com.
-//
-// Usa el endpoint /v1/images/edits con varias imagenes de referencia (logo + capturas de
-// marca) para que la imagen generada mantenga consistencia visual, en vez de generar algo
-// generico desde cero.
 
 const MODEL = 'gpt-image-1';
 
@@ -25,8 +21,10 @@ function dataUriToBlob(dataUri) {
   return new Blob([buffer], { type: mime });
 }
 
-// referencias: array de data URIs (logo, referencia_1, referencia_2 — las que existan).
-async function generarImagenDePrueba({ prompt, referencias }) {
+// referencias: array de data URIs (imágenes de estilo de Identidad visual). Si hay al
+// menos una, se usa /v1/images/edits (genera guiándose por esas imágenes). Si no hay
+// ninguna, se usa /v1/images/generations (texto a imagen puro, sin referencia visual).
+async function generarFondoImagen({ prompt, referencias }) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     const err = new Error('Falta configurar OPENAI_API_KEY en las variables de entorno del servicio.');
@@ -34,22 +32,34 @@ async function generarImagenDePrueba({ prompt, referencias }) {
     throw err;
   }
 
-  const form = new FormData();
-  form.append('model', MODEL);
-  form.append('prompt', prompt);
-  form.append('size', '1024x1024');
-  form.append('n', '1');
-
   const refs = (referencias || []).filter(Boolean);
-  refs.forEach((dataUri, i) => {
-    form.append('image[]', dataUriToBlob(dataUri), `referencia_${i}.png`);
-  });
+  let res;
 
-  const res = await fetch('https://api.openai.com/v1/images/edits', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${apiKey}` },
-    body: form,
-  });
+  if (refs.length > 0) {
+    const form = new FormData();
+    form.append('model', MODEL);
+    form.append('prompt', prompt);
+    form.append('size', '1024x1024');
+    form.append('n', '1');
+    refs.forEach((dataUri, i) => {
+      form.append('image[]', dataUriToBlob(dataUri), `referencia_${i}.png`);
+    });
+
+    res = await fetch('https://api.openai.com/v1/images/edits', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiKey}` },
+      body: form,
+    });
+  } else {
+    res = await fetch('https://api.openai.com/v1/images/generations', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ model: MODEL, prompt, size: '1024x1024', n: 1 }),
+    });
+  }
 
   if (!res.ok) {
     const bodyText = await res.text().catch(() => '');
@@ -65,4 +75,4 @@ async function generarImagenDePrueba({ prompt, referencias }) {
   return `data:image/png;base64,${b64}`;
 }
 
-module.exports = { generarImagenDePrueba };
+module.exports = { generarFondoImagen };

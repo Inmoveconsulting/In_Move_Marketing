@@ -32,23 +32,17 @@
   <% } %>
 
   <p class="field-help">
-    Subí imágenes de referencia que ya sabés que representan bien a la marca — fotos o
-    piezas que te gusten, no hace falta generar nada nuevo. Qué buscar en una buena
-    referencia:
+    Esto define la base que va a usar la IA para generar el fondo de cada imagen en
+    Contenido — no genera nada acá todavía. Logo opcional (si no subís uno, las imágenes
+    van sin logo). Las 2 referencias son para guiar el estilo visual, no hace falta que
+    sean perfectas.
   </p>
-  <ul class="field-help" style="margin-top:-8px">
-    <li>Que tenga una zona de fondo liso o de bajo contraste, para poder poner un título
-      encima más adelante sin que compita con la imagen.</li>
-    <li>Que el tono (colores, luz, energía) se sienta coherente con la marca — revisá el
-      tono de voz del perfil de producto si tenés dudas.</li>
-    <li>Formato cuadrado o parecido, para que sirva igual en LinkedIn e Instagram.</li>
-  </ul>
 
   <% if (readonly) { %>
     <div class="identidad-grid">
       <div>
         <p class="muted small">Logo</p>
-        <% if (iv.logo) { %><img class="identidad-thumb" src="<%= iv.logo %>" alt="Logo"><% } %>
+        <% if (iv.logo) { %><img class="identidad-thumb" src="<%= iv.logo %>" alt="Logo"><% } else { %><p class="muted small">(sin logo)</p><% } %>
       </div>
       <% if (iv.referencia_1) { %>
         <div><p class="muted small">Referencia 1</p><img class="identidad-thumb" src="<%= iv.referencia_1 %>" alt="Referencia 1"></div>
@@ -57,29 +51,34 @@
         <div><p class="muted small">Referencia 2</p><img class="identidad-thumb" src="<%= iv.referencia_2 %>" alt="Referencia 2"></div>
       <% } %>
     </div>
-    <% if (iv.notas_estilo) { %><div class="field-readonly"><%= iv.notas_estilo %></div><% } %>
+    <p class="muted small" style="margin-top:16px">Prompt de imagen:</p>
+    <div class="field-readonly"><%= iv.prompt_imagen %></div>
   <% } else { %>
     <form method="POST" action="/productos/<%= producto.slug %>/identidad-visual" enctype="multipart/form-data">
       <div class="field">
-        <label for="logo">Logo (obligatorio)</label>
+        <label for="logo">Logo (opcional)</label>
         <% if (iv && iv.logo) { %><img class="identidad-thumb" src="<%= iv.logo %>" alt="Logo actual"><% } %>
         <input type="file" id="logo" name="logo" accept="image/*">
       </div>
       <div class="field">
-        <label for="referencia_1">Referencia 1 — una foto/imagen que represente el estilo que buscás</label>
+        <label for="referencia_1">Referencia 1 — una imagen que represente el estilo que te gusta</label>
         <% if (iv && iv.referencia_1) { %><img class="identidad-thumb" src="<%= iv.referencia_1 %>" alt="Referencia 1 actual"><% } %>
         <input type="file" id="referencia_1" name="referencia_1" accept="image/*">
       </div>
       <div class="field">
-        <label for="referencia_2">Referencia 2 — opcional</label>
+        <label for="referencia_2">Referencia 2</label>
         <% if (iv && iv.referencia_2) { %><img class="identidad-thumb" src="<%= iv.referencia_2 %>" alt="Referencia 2 actual"><% } %>
         <input type="file" id="referencia_2" name="referencia_2" accept="image/*">
       </div>
 
       <div class="field">
-        <label for="notas_estilo">Notas (opcional)</label>
-        <p class="field-help">Cualquier contexto adicional sobre por qué elegiste estas referencias, para quien retome esto más adelante.</p>
-        <textarea id="notas_estilo" name="notas_estilo" rows="3"><%= (iv && iv.notas_estilo) || '' %></textarea>
+        <label for="prompt_imagen">Prompt de tu imagen</label>
+        <p class="field-help">
+          Este es el texto que se le va a mandar a la IA para generar el fondo de cada
+          pieza. Podés modificarlo agregando o quitando instrucciones — por ejemplo mood
+          (alegre, formal), colores de marca, qué evitar.
+        </p>
+        <textarea id="prompt_imagen" name="prompt_imagen" rows="8"><%= (iv && iv.prompt_imagen) || '' %></textarea>
       </div>
 
       <div class="form-actions">

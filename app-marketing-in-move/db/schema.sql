@@ -53,17 +53,21 @@ CREATE TABLE IF NOT EXISTS planes_marketing (
 -- Por si la tabla ya existia de un deploy anterior a que se agregara canales_razon.
 ALTER TABLE planes_marketing ADD COLUMN IF NOT EXISTS canales_razon TEXT DEFAULT '';
 
--- identidad_visual: paso previo de la Pantalla 3, antes de generar copys + imagenes.
--- Define la identidad visual de marca subiendo imagenes de referencia (logo + hasta 2
--- referencias) que la usuaria ya sabe que funcionan. Mismo patron de version/estado que
--- el resto. Las imagenes se guardan como data URI base64 en TEXT — a esta escala (un
--- puñado de imagenes por producto) no justifica sumar un storage externo (S3, etc.).
+-- identidad_visual: base visual de marca para la Pantalla 3 (Contenido). Logo (opcional)
+-- + hasta 2 imagenes de referencia de estilo + un prompt de imagen editable. No genera
+-- nada acá: cada pieza de Contenido usa esta base (referencias + prompt) para pedirle a
+-- la IA de imagenes que genere su propio fondo. Mismo patron de version/estado que el
+-- resto. Las imagenes se guardan como data URI base64 en TEXT.
 --
--- Nota: se probo generar la imagen de prueba con IA (columnas estilo, prompt_imagen,
--- imagen_generada, prompt_usado, intentos, y la tabla identidad_visual_intentos de abajo)
--- pero el resultado no convencia y salia caro — se volvio al flujo simple de subir
--- referencias directo. Las columnas quedan en la tabla sin uso activo por si se retoma
--- mas adelante, no se borran para no arriesgar datos ya guardados.
+-- Historial de decisiones (por si se revisita esto): se probo (1) generar una imagen de
+-- prueba para aprobar como "plantilla" fija — se abandono porque no tiene sentido con
+-- fondos generados por pieza; y (2) no generar nada, solo reusar las 2 referencias tal
+-- cual como fondo de cada pieza — se abandono porque curar fotos a mano es justamente el
+-- trabajo manual que se queria automatizar. La version actual (Pantalla 3 genera un fondo
+-- nuevo por pieza vía OpenAI, usando estas referencias como guia de estilo) combina lo
+-- mejor de las dos. Columnas estilo, notas_estilo, imagen_generada, prompt_usado,
+-- intentos y la tabla identidad_visual_intentos de abajo quedan sin uso activo de
+-- intentos anteriores — no se borran para no arriesgar datos ya guardados.
 CREATE TABLE IF NOT EXISTS identidad_visual (
   id SERIAL PRIMARY KEY,
   producto_id INTEGER NOT NULL REFERENCES productos(id),
@@ -74,7 +78,7 @@ CREATE TABLE IF NOT EXISTS identidad_visual (
   referencia_2 TEXT,
   estilo TEXT DEFAULT '',
   notas_estilo TEXT DEFAULT '',
-  prompt_imagen TEXT DEFAULT '',
+  prompt_imagen TEXT DEFAULT '', -- prompt base editable, usado por cada pieza de Contenido
   imagen_generada TEXT,
   prompt_usado TEXT DEFAULT '',
   intentos INTEGER NOT NULL DEFAULT 0,
@@ -105,11 +109,12 @@ CREATE TABLE IF NOT EXISTS identidad_visual_intentos (
 -- tramo (1, 2, 3...) dentro de la duracion del plan. El pilar de cada semana rota sobre
 -- calendario del plan (calendario[(semana-1) % calendario.length]).
 --
--- La imagen se COMPONE con codigo (fondo de identidad_visual + texto_imagen superpuesto +
--- logo), no se le pide a un modelo de IA de imagen que la dibuje entera — el texto sobre
--- imagen generado por IA suele salir mal escrito. texto_imagen es el titular corto que se
--- superpone (distinto de copy, que es el texto completo del posteo). Tambien se puede
--- subir una imagen propia a mano, que reemplaza a la compuesta.
+-- La imagen de cada pieza: el FONDO lo genera la IA de OpenAI (usando el prompt +
+-- referencias de identidad_visual), y el titular + logo se COMPONEN aparte con codigo —
+-- el texto sobre imagen generado por un modelo de IA suele salir mal escrito, componerlo
+-- a mano garantiza que quede exacto. texto_imagen es el titular corto que se superpone
+-- (distinto de copy, que es el texto completo del posteo). Las piezas de canales sin
+-- imagen (Email) no la llevan. Tambien se puede subir una imagen propia a mano.
 CREATE TABLE IF NOT EXISTS contenido_generado (
   id SERIAL PRIMARY KEY,
   plan_marketing_id INTEGER NOT NULL REFERENCES planes_marketing(id),

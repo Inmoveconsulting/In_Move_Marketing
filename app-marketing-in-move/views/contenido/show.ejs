@@ -23,17 +23,17 @@
   <% } %>
 
   <p class="field-help">
-    Se genera de a una semana por vez, no el plan completo. Cada semana usa un pilar de
-    contenido distinto (rotan sobre los del plan) y genera una pieza por cada vez/semana
-    de cada canal. El copy lo escribe la IA. La imagen de cada pieza se compone aparte,
-    con el botón "Crear imagen": fondo de identidad visual + un titular corto + tu logo —
-    el texto se dibuja con código, no lo escribe la IA de imagen, para que salga siempre
-    bien. Todo queda en borrador — todavía no hay cola de aprobación.
+    Se genera de a una semana por vez, no el plan completo. Primero los copys (un pilar
+    distinto por semana, rotan sobre los del plan); recién con los copys ya creados se
+    pueden generar las imágenes. Cada imagen la genera la IA (OpenAI) usando las
+    referencias y el prompt de Identidad visual — el titular y el logo se agregan aparte,
+    con código, para que salgan siempre nítidos. Las piezas de Email no llevan imagen.
+    Todo queda en borrador — todavía no hay cola de aprobación.
   </p>
-  <% if (!hayFondos) { %>
+  <% if (!hayIdentidad) { %>
     <p class="callout">
-      Para crear imágenes hace falta al menos una referencia aprobada en
-      <a href="/productos/<%= producto.slug %>/identidad-visual">Identidad visual</a>.
+      Para crear imágenes hace falta aprobar
+      <a href="/productos/<%= producto.slug %>/identidad-visual">Identidad visual</a> primero.
     </p>
   <% } %>
 
@@ -50,6 +50,14 @@
           <button type="submit">Generar semana <%= s.numero %></button>
         </form>
       <% } else { %>
+
+        <% if (hayIdentidad && s.faltanImagenes) { %>
+          <form method="POST" action="/productos/<%= producto.slug %>/contenido/generar-imagenes-semana">
+            <input type="hidden" name="numero" value="<%= s.numero %>">
+            <button type="submit">Crear imágenes de la semana <%= s.numero %></button>
+          </form>
+        <% } %>
+
         <div class="piezas-grid">
           <% s.piezas.forEach(function (p) { %>
             <div class="pieza-card">
@@ -64,26 +72,30 @@
                 <button type="submit">Regenerar copy</button>
               </form>
 
-              <% if (p.imagen_ref) { %>
-                <img class="identidad-thumb" src="<%= p.imagen_ref %>" alt="Imagen de la pieza">
-              <% } %>
+              <% if (!canalesSinImagen.includes(p.canal)) { %>
+                <% if (p.imagen_ref) { %>
+                  <img class="identidad-thumb" src="<%= p.imagen_ref %>" alt="Imagen de la pieza">
+                <% } %>
 
-              <% if (hayFondos) { %>
-                <form method="POST" action="/productos/<%= producto.slug %>/contenido/pieza/<%= p.id %>/imagen-ia">
-                  <label class="muted small">Titular de la imagen (vacío = lo escribe la IA)</label>
-                  <textarea name="texto_imagen" rows="2"><%= p.texto_imagen || '' %></textarea>
+                <% if (hayIdentidad) { %>
+                  <form method="POST" action="/productos/<%= producto.slug %>/contenido/pieza/<%= p.id %>/imagen-ia">
+                    <label class="muted small">Titular de la imagen (vacío = lo escribe la IA)</label>
+                    <textarea name="texto_imagen" rows="2"><%= p.texto_imagen || '' %></textarea>
+                    <div class="form-actions">
+                      <button type="submit"><%= p.imagen_ref ? 'Regenerar imagen' : 'Crear imagen' %></button>
+                    </div>
+                  </form>
+                <% } %>
+
+                <form method="POST" action="/productos/<%= producto.slug %>/contenido/pieza/<%= p.id %>/imagen" enctype="multipart/form-data">
+                  <input type="file" name="imagen" accept="image/*">
                   <div class="form-actions">
-                    <button type="submit"><%= p.imagen_ref ? 'Regenerar imagen' : 'Crear imagen' %></button>
+                    <button type="submit">O subir la mía</button>
                   </div>
                 </form>
+              <% } else { %>
+                <p class="muted small" style="margin-top:10px">Este canal no lleva imagen.</p>
               <% } %>
-
-              <form method="POST" action="/productos/<%= producto.slug %>/contenido/pieza/<%= p.id %>/imagen" enctype="multipart/form-data">
-                <input type="file" name="imagen" accept="image/*">
-                <div class="form-actions">
-                  <button type="submit">O subir la mía</button>
-                </div>
-              </form>
             </div>
           <% }); %>
         </div>
