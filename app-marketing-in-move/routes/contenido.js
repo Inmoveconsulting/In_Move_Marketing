@@ -68,6 +68,22 @@ function referenciasDeIdentidad(identidad) {
   return [identidad.referencia_1, identidad.referencia_2].filter(Boolean);
 }
 
+// Sin esto, todas las piezas de una misma semana (mismo pilar, mismas referencias, prompt
+// casi idéntico) le piden a la IA prácticamente lo mismo y salen como la misma foto
+// repetida. Forzar un encuadre distinto por pieza es lo que rompe esa uniformidad.
+const TOMAS = [
+  'Primer plano de manos escribiendo o señalando en una laptop, sin mostrar toda la cara.',
+  'Plano medio de una persona mirando la pantalla y señalando un gráfico con el dedo.',
+  'Toma desde atrás del hombro, mirando hacia una pantalla con un dashboard.',
+  'Plano abierto de dos personas conversando frente a una laptop, mesa de por medio.',
+  'Primer plano de una pantalla con datos/gráficos, con una mano apoyada al lado.',
+  'Plano medio lateral de una persona pensativa mirando un documento impreso.',
+];
+
+function tomaAleatoria() {
+  return TOMAS[Math.floor(Math.random() * TOMAS.length)];
+}
+
 // Arma el fondo (vía OpenAI) + compone el titular y el logo encima (vía código). Si no
 // se pasa un texto explícito, usa el que ya tenía la pieza o le pide uno a la IA.
 async function generarImagenParaPieza({ pieza, plan, perfil, identidad, textoOverride }) {
@@ -86,6 +102,9 @@ ${identidad.prompt_imagen}
 
 Contexto de esta pieza puntual: pilar de contenido "${pilarObj.pilar}" — ${pilarObj.descripcion}.
 Canal: ${pieza.canal}.
+
+Encuadre para ESTA imagen puntual (para que no se repita el mismo encuadre que otras
+piezas de la misma semana): ${tomaAleatoria()}
 
 No incluyas texto ni logos en la imagen — eso se agrega aparte. Formato cuadrado.
 `.trim();
