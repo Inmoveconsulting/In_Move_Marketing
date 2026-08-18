@@ -119,8 +119,51 @@ oraciones cortas, no más) para que la respuesta no se corte, y no agregues camp
   return extractJson(text, { stopReason });
 }
 
+// Pantalla 3 — genera el copy de una pieza puntual, usando el perfil + la fila del
+// calendario (pilar) correspondiente + el canal, como pide la spec. Un texto plano, no
+// JSON — no hay estructura que parsear, solo el copy final.
+async function sugerirCopy({ perfil, objetivoPlan, pilar, canal }) {
+  const system =
+    'Sos un copywriter B2B experto. Escribís en español, siguiendo el tono de voz y las frases guía de la marca que se te dan. Respondés ÚNICAMENTE con el texto final del copy — sin explicaciones, sin comillas, sin encabezados, sin markdown.';
+
+  const prompt = `
+${resumenPerfil(perfil)}
+
+FRASES Y CONCEPTOS GUÍA DE LA MARCA (usalos si calzan naturalmente, no los fuerces):
+${perfil.frases_guia}
+
+OBJETIVO DE ESTE PLAN DE MARKETING:
+${objetivoPlan}
+
+PILAR DE CONTENIDO DE ESTA PIEZA: ${pilar.pilar}
+${pilar.descripcion}
+
+CTA A USAR: ${pilar.cta}
+
+CANAL: ${canal}
+
+Tarea: escribí el copy de esta pieza para el canal de arriba, siguiendo el tono de voz y
+las reglas de la marca. Adaptá longitud y formato a las convenciones del canal:
+- LinkedIn: puede ser más largo (hasta ~1200 caracteres), con saltos de línea cortos para
+  que se lea bien, tono profesional pero humano.
+- Instagram: más corto y directo, más visual/emocional, sin sonar corporativo.
+- Email: escribí primero una línea "Asunto: ..." y después el cuerpo del mensaje.
+- Otro canal: usá tu criterio según sus convenciones habituales.
+
+Si el CTA de arriba no es "sin CTA duro", cerrá el copy con ese llamado a la acción de
+forma natural, no pegado como una fórmula. Si es "sin CTA duro", el cierre puede invitar a
+comentar o reflexionar, sin CTA de conversión.
+
+Devolvé solo el texto final del copy, listo para publicar.
+`.trim();
+
+  const { text } = await askClaude({ system, prompt, maxTokens: 700 });
+  return text.trim();
+}
+
 module.exports = {
   sugerirDuracion,
   sugerirCanales,
   sugerirCalendario,
+  sugerirCopy,
 };

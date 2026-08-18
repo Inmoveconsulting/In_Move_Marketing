@@ -47,6 +47,17 @@ async function getIdentidadVisualVersiones(productoId) {
   return rows;
 }
 
+// El plan de marketing aprobado mas reciente. La generacion de contenido (Pantalla 3) no
+// puede arrancar sin esto.
+async function getPlanAprobadoActual(productoId) {
+  const { rows } = await pool.query(
+    `SELECT * FROM planes_marketing WHERE producto_id = $1 AND estado = 'aprobado'
+     ORDER BY version DESC LIMIT 1`,
+    [productoId]
+  );
+  return rows[0];
+}
+
 module.exports = {
   getProducto,
   getPerfilVersiones,
@@ -54,4 +65,5 @@ module.exports = {
   getPerfilPorId,
   getPlanVersiones,
   getIdentidadVisualVersiones,
+  getPlanAprobadoActual,
 };

@@ -9,6 +9,7 @@ const productosRouter = require('./routes/productos');
 const perfilesRouter = require('./routes/perfiles');
 const planesRouter = require('./routes/planes');
 const identidadVisualRouter = require('./routes/identidadVisual');
+const contenidoRouter = require('./routes/contenido');
 
 const app = express();
 
@@ -32,6 +33,7 @@ app.use('/', productosRouter);
 app.use('/productos/:slug/perfil', perfilesRouter);
 app.use('/productos/:slug/plan', planesRouter);
 app.use('/productos/:slug/identidad-visual', identidadVisualRouter);
+app.use('/productos/:slug/contenido', contenidoRouter);
 
 app.use((req, res) => {
   res.status(404).send('No encontrado.');

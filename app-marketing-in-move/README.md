@@ -7,8 +7,7 @@ No comparte código, base de datos ni configuración con esa app — no la toca.
 ## Estado actual
 
 Están construidas la **Pantalla 1 — Perfil de producto**, la **Pantalla 2 — Plan de Marketing**
-y el paso previo de la **Pantalla 3 — Identidad visual** (definir imágenes de referencia de
-marca, antes de generar copys + imágenes por pieza):
+y la **Pantalla 3 — Generación de contenido** (identidad visual + generación de copys):
 
 **Pantalla 1:**
 - Selector de producto (pantalla 0) con alta de productos nuevos.
@@ -30,6 +29,12 @@ marca, antes de generar copys + imágenes por pieza):
 3. **"Aprobar identidad visual"** — congela esa versión como la referencia de marca aprobada. Mismo patrón de estado/versión que el resto.
 
 *(Se probó primero generar la imagen con IA — OpenAI `gpt-image-1`, con estilos, prompt editable y regeneración — pero el resultado no convencía y salía caro por intento. Se volvió a este flujo más simple y sin costo. El código de esa prueba queda en `lib/openaiImagenes.js`, sin uso activo, por si se retoma más adelante para la generación real de piezas.)*
+
+**Contenido** (requiere un plan aprobado — si no hay ninguno, te manda de vuelta a la Pantalla 2):
+1. Se genera **por semana, no el plan completo de una** (regla de la spec). Cada semana usa un pilar de contenido distinto — rotan sobre los pilares del calendario del plan (semana 1 usa el primero, semana 2 el segundo, y si hay más semanas que pilares vuelve a empezar).
+2. Botón **"Generar semana N"** — un disparo de IA por pieza (una por cada vez/semana de cada canal del plan), con el perfil + la fila del calendario correspondiente como contexto, como pide la spec. Si algo falla a mitad de camino, tocar el botón de nuevo solo completa lo que falta, no duplica lo ya generado.
+3. Cada pieza tiene su **copy editable** (o "Regenerar copy" para pedirle a la IA que lo reescriba) y un espacio para **subir la imagen a mano** (sin IA — misma decisión que en identidad visual).
+4. Todo queda en estado **"borrador"** — la cola de aprobación (Pantalla 4) todavía no existe, así que por ahora se edita directo acá.
 
 Las sugerencias de IA son eso — sugerencias. Todo queda como borrador editable y nada se aprueba solo; vos revisás y aprobás cada paso, como pide la spec.
 
@@ -54,12 +59,13 @@ app-marketing-in-move/
   routes/productos.js      selector de producto (pantalla 0)
   routes/perfiles.js       perfil de producto (pantalla 1)
   routes/planes.js         plan de marketing (pantalla 2)
-  routes/identidadVisual.js identidad visual — paso previo de la pantalla 3
+  routes/identidadVisual.js identidad visual (dentro de la pantalla 3)
+  routes/contenido.js      generación de copys + imágenes por pieza (pantalla 3)
   lib/seedTalent.js        datos reales de In Move Talent v1.1, para el botón "cargar ejemplo"
   lib/queries.js           consultas SQL compartidas entre pantallas
   lib/claude.js            cliente minimo de la API de Claude (sin SDK, un fetch)
-  lib/sugerenciasIA.js     los 3 prompts de IA de la pantalla 2 (duración, canales, calendario)
-  lib/openaiImagenes.js    cliente minimo de la API de imágenes de OpenAI (gpt-image-1)
+  lib/sugerenciasIA.js     prompts de IA: duración/canales/calendario (pantalla 2) y copy (pantalla 3)
+  lib/openaiImagenes.js    cliente de imágenes de OpenAI — sin uso activo (ver Identidad visual)
   views/                   plantillas EJS
   public/style.css         estilos
   render.yaml              config para que Render cree el servicio + la base con un click
@@ -83,10 +89,11 @@ que se aprueba.
 elegido, y la imagen de prueba generada (se sobreescribe en cada regeneración mientras está
 en borrador). `intentos` cuenta cuántas veces se regeneró, solo informativo.
 
-**contenido_generado** *(tabla creada, sin pantalla todavía — resto de la pantalla 3)* — cada
-pieza referencia el plan y la versión de perfil que la generó, con su propio estado
-(`borrador` → ... → `publicado`) y `version_origen_id` para cuando una pieza se regenera
-por feedback.
+**contenido_generado** — cada pieza referencia el plan y la versión de perfil que la generó,
+más `semana` (el tramo al que pertenece) y `pilar` (cuál usó). Estado (`borrador` → ... →
+`publicado`) y `version_origen_id` para cuando una pieza se regenera por feedback — hoy
+regenerar pisa el copy en el lugar porque todavía no hay cola de aprobación que proteja
+versiones anteriores; cuando se construya la Pantalla 4 esto pasa a versionar de verdad.
 
 Este esqueleto ya cubre la trazabilidad completa que pide la spec: "todo objeto lleva versión
 y trazabilidad de qué versión de qué otro objeto lo originó".
@@ -237,9 +244,24 @@ Cuando te dé archivos nuevos o modificados:
    texto, tono coherente, formato cuadrado).
 4. Guardá borrador, revisalo, y **"Aprobar identidad visual"**.
 
+## Cómo probar Contenido con datos reales
+
+1. Con el plan de In Move Talent aprobado, entrá a "In Move Talent" y tocá **"Ir a
+   contenido →"** (junto a "Ver historial" en la Pantalla 2).
+2. Vas a ver una sección por cada semana del plan (90 días = 13 semanas), cada una con su
+   pilar de contenido.
+3. Tocá **"Generar semana 1"** — tarda unos segundos (una llamada a Claude por cada pieza:
+   con 4 LinkedIn + 2 Instagram + 1 Email serían 7 piezas). Revisá el copy de cada una
+   contra el pilar y el tono del perfil.
+4. Si alguna no te convence, **"Regenerar copy"** esa sola, o editala directo en el
+   textarea y **"Guardar copy"**.
+5. Subí una imagen a alguna pieza para probar ese flujo (podés reusar el logo o una
+   referencia que ya subiste en Identidad visual).
+6. Repetí con la semana 2 para confirmar que rota al segundo pilar del calendario.
+
 ## Qué sigue (no construido todavía)
 
-El resto de la Pantalla 3: generación de copys + imagen por pieza (por tramo, no el plan
-completo de una), usando el perfil + la fila del calendario correspondiente + la plantilla
-visual aprobada como contexto. Después, cola de aprobación y publicación (pantallas 4 y 5),
-y medición con recomendación de próximo plan (pantalla 6).
+Cola de aprobación (Pantalla 4 — gate central: aprobar / pedir cambios / rechazar cada
+pieza, y marcar como "a revisar" las piezas generadas con una versión de perfil vieja
+cuando el perfil cambia), publicación vía Metricool (Pantalla 5), y medición con
+recomendación de próximo plan (Pantalla 6).

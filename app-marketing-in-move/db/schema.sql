@@ -100,13 +100,17 @@ CREATE TABLE IF NOT EXISTS identidad_visual_intentos (
   UNIQUE(identidad_visual_id, numero)
 );
 
--- contenido_generado: Pantalla 3, generacion de copys + imagenes por pieza (todavia sin
--- pantalla propia). Se crea ahora para que el modelo de datos completo quede consistente
--- desde el arranque y no haga falta una migracion cuando se construya esa parte.
+-- contenido_generado: Pantalla 3, generacion de copys + imagenes por pieza. Se genera por
+-- tramo (semana) segun pide la spec, no el plan completo de una — "semana" identifica el
+-- tramo (1, 2, 3...) dentro de la duracion del plan. El pilar de cada semana rota sobre
+-- calendario del plan (calendario[(semana-1) % calendario.length]). La imagen NO se genera
+-- con IA (ver decision en identidad_visual) — se sube a mano por pieza, igual patron que
+-- el resto de las imagenes de la app (data URI base64).
 CREATE TABLE IF NOT EXISTS contenido_generado (
   id SERIAL PRIMARY KEY,
   plan_marketing_id INTEGER NOT NULL REFERENCES planes_marketing(id),
   perfil_producto_id INTEGER NOT NULL REFERENCES perfiles_producto(id),
+  semana INTEGER,
   canal TEXT NOT NULL,
   fecha_programada DATE,
   pilar TEXT,
@@ -118,6 +122,9 @@ CREATE TABLE IF NOT EXISTS contenido_generado (
   creado_en TIMESTAMPTZ NOT NULL DEFAULT now(),
   actualizado_en TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Por si la tabla ya existia de un deploy anterior a que se agregara semana.
+ALTER TABLE contenido_generado ADD COLUMN IF NOT EXISTS semana INTEGER;
 
 -- Productos iniciales (no pisa nada si ya existen).
 INSERT INTO productos (slug, nombre) VALUES ('talent', 'In Move Talent') ON CONFLICT (slug) DO NOTHING;

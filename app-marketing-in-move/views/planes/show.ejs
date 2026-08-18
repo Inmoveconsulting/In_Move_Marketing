@@ -16,6 +16,9 @@
   <div class="perfil-actions">
     <a href="/productos/<%= producto.slug %>/perfil">← perfil de producto</a>
     <a href="/productos/<%= producto.slug %>/plan/historial">Ver historial<% if (totalVersiones) { %> (<%= totalVersiones %>)<% } %></a>
+    <% if (plan && plan.estado === 'aprobado') { %>
+      <a href="/productos/<%= producto.slug %>/contenido">Ir a contenido →</a>
+    <% } %>
   </div>
 </div>
 

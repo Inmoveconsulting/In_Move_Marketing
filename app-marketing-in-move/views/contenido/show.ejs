@@ -1,0 +1,84 @@
+<%- include('../partials/header') %>
+
+<div class="perfil-header">
+  <div>
+    <h1>Contenido</h1>
+    <% if (plan) { %><span class="muted small">Plan v<%= plan.version %> — <%= plan.duracion_dias %> días</span><% } %>
+  </div>
+  <div class="perfil-actions">
+    <a href="/productos/<%= producto.slug %>/plan">← plan de marketing</a>
+  </div>
+</div>
+
+<% if (!plan) { %>
+  <p class="callout">
+    Este producto todavía no tiene un plan de marketing aprobado. Hace falta aprobar el
+    plan antes de generar contenido —
+    <a href="/productos/<%= producto.slug %>/plan">ir al plan de marketing</a>.
+  </p>
+<% } else { %>
+
+  <% if (error) { %>
+    <p class="callout callout-error"><%= error %></p>
+  <% } %>
+
+  <p class="field-help">
+    Se genera de a una semana por vez, no el plan completo. Cada semana usa un pilar de
+    contenido distinto (rotan sobre los del plan) y genera una pieza por cada vez/semana
+    de cada canal. El copy lo escribe la IA; la imagen la subís vos a cada pieza.
+    Todo queda en borrador — todavía no hay cola de aprobación.
+  </p>
+
+  <% semanas.forEach(function (s) { %>
+    <section class="plan-section">
+      <h2>Semana <%= s.numero %><% if (s.pilar) { %> — <%= s.pilar.pilar %><% } %></h2>
+      <% if (s.pilar) { %>
+        <p class="muted small"><%= s.pilar.descripcion %> · CTA: <%= s.pilar.cta %></p>
+      <% } %>
+
+      <% if (s.piezas.length === 0) { %>
+        <form method="POST" action="/productos/<%= producto.slug %>/contenido/generar-semana">
+          <input type="hidden" name="numero" value="<%= s.numero %>">
+          <button type="submit">Generar semana <%= s.numero %></button>
+        </form>
+      <% } else { %>
+        <div class="piezas-grid">
+          <% s.piezas.forEach(function (p) { %>
+            <div class="pieza-card">
+              <span class="badge badge-vacio"><%= p.canal %></span>
+              <form method="POST" action="/productos/<%= producto.slug %>/contenido/pieza/<%= p.id %>/copy">
+                <textarea name="copy" rows="8"><%= p.copy || '' %></textarea>
+                <div class="form-actions">
+                  <button type="submit">Guardar copy</button>
+                </div>
+              </form>
+              <form method="POST" action="/productos/<%= producto.slug %>/contenido/pieza/<%= p.id %>/regenerar">
+                <button type="submit">Regenerar copy</button>
+              </form>
+
+              <% if (p.imagen_ref) { %>
+                <img class="identidad-thumb" src="<%= p.imagen_ref %>" alt="Imagen de la pieza">
+              <% } %>
+              <form method="POST" action="/productos/<%= producto.slug %>/contenido/pieza/<%= p.id %>/imagen" enctype="multipart/form-data">
+                <input type="file" name="imagen" accept="image/*">
+                <div class="form-actions">
+                  <button type="submit"><%= p.imagen_ref ? 'Reemplazar imagen' : 'Subir imagen' %></button>
+                </div>
+              </form>
+            </div>
+          <% }); %>
+        </div>
+
+        <% if (!s.completa) { %>
+          <form method="POST" action="/productos/<%= producto.slug %>/contenido/generar-semana">
+            <input type="hidden" name="numero" value="<%= s.numero %>">
+            <button type="submit">Completar semana <%= s.numero %> (<%= s.piezas.length %>/<%= s.totalEsperado %>)</button>
+          </form>
+        <% } %>
+      <% } %>
+    </section>
+  <% }); %>
+
+<% } %>
+
+<%- include('../partials/footer') %>
