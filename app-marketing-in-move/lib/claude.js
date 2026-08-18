@@ -46,29 +46,48 @@ async function askClaude({ system, prompt, maxTokens = 1200 }) {
     .trim();
 
   if (!text) {
-    throw new Error('La API de Claude devolvió una respuesta vacía.');
+    throw new Error(
+      `La API de Claude devolvió una respuesta vacía (stop_reason: ${data.stop_reason || 'desconocido'}).`
+    );
   }
 
-  return text;
+  // stop_reason "max_tokens" significa que se cortó por el límite — si extractJson
+  // despues no logra parsear el JSON, ese dato ayuda a saber por qué.
+  return { text, stopReason: data.stop_reason };
 }
 
 // Las sugerencias siempre le pedimos que respondan en JSON. Esto tolera que igual venga
 // envuelto en un bloque ```json ... ``` (a veces pasa aunque se lo pidamos explícito).
-function extractJson(text) {
+// Si no se puede interpretar, el error incluye un fragmento de lo que respondió Claude
+// para poder diagnosticar sin tener que ir a mirar logs.
+function extractJson(text, { stopReason } = {}) {
   let cleaned = text.trim();
   const fenced = cleaned.match(/```(?:json)?\s*([\s\S]*?)```/i);
   if (fenced) cleaned = fenced[1].trim();
 
-  try {
-    return JSON.parse(cleaned);
-  } catch (e) {
-    const start = cleaned.indexOf('{');
-    const end = cleaned.lastIndexOf('}');
-    if (start !== -1 && end !== -1 && end > start) {
-      return JSON.parse(cleaned.slice(start, end + 1));
+  const tryParse = (candidate) => {
+    try {
+      return { ok: true, value: JSON.parse(candidate) };
+    } catch (e) {
+      return { ok: false };
     }
-    throw new Error('No se pudo interpretar la respuesta de Claude como JSON.');
+  };
+
+  let attempt = tryParse(cleaned);
+  if (attempt.ok) return attempt.value;
+
+  const start = cleaned.indexOf('{');
+  const end = cleaned.lastIndexOf('}');
+  if (start !== -1 && end !== -1 && end > start) {
+    attempt = tryParse(cleaned.slice(start, end + 1));
+    if (attempt.ok) return attempt.value;
   }
+
+  const motivo = stopReason === 'max_tokens' ? ' (se cortó por límite de longitud)' : '';
+  const preview = cleaned.slice(0, 500) || '(respuesta vacía)';
+  throw new Error(
+    `No se pudo interpretar la respuesta de Claude como JSON${motivo}. Lo que respondió: "${preview}"`
+  );
 }
 
 module.exports = { askClaude, extractJson };

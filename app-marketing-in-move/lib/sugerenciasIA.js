@@ -48,8 +48,8 @@ oraciones cortas, no más) para que la respuesta no se corte:
 {"duracion_dias": <número entero>, "razon": "<2 a 3 oraciones breves explicando por qué>"}
 `.trim();
 
-  const text = await askClaude({ system: SYSTEM, prompt, maxTokens: 600 });
-  return extractJson(text);
+  const { text, stopReason } = await askClaude({ system: SYSTEM, prompt, maxTokens: 600 });
+  return extractJson(text, { stopReason });
 }
 
 async function sugerirCanales({ perfil, objetivo, duracionDias }) {
@@ -80,8 +80,8 @@ oraciones cortas, no más) para que la respuesta no se corte, y no agregues camp
 }
 `.trim();
 
-  const text = await askClaude({ system: SYSTEM, prompt, maxTokens: 1000 });
-  return extractJson(text);
+  const { text, stopReason } = await askClaude({ system: SYSTEM, prompt, maxTokens: 1000 });
+  return extractJson(text, { stopReason });
 }
 
 async function sugerirCalendario({ perfil, objetivo, duracionDias, canales }) {
@@ -115,8 +115,8 @@ oraciones cortas, no más) para que la respuesta no se corte, y no agregues camp
 }
 `.trim();
 
-  const text = await askClaude({ system: SYSTEM, prompt, maxTokens: 1300 });
-  return extractJson(text);
+  const { text, stopReason } = await askClaude({ system: SYSTEM, prompt, maxTokens: 1300 });
+  return extractJson(text, { stopReason });
 }
 
 module.exports = { sugerirDuracion, sugerirCanales, sugerirCalendario };
