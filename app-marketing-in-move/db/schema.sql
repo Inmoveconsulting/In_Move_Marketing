@@ -68,14 +68,31 @@ CREATE TABLE IF NOT EXISTS identidad_visual (
   referencia_2 TEXT,
   estilo TEXT DEFAULT '',
   notas_estilo TEXT DEFAULT '',
+  prompt_imagen TEXT DEFAULT '',  -- prompt editable, mostrado y ajustable en pantalla
   imagen_generada TEXT,
-  prompt_usado TEXT DEFAULT '',
+  prompt_usado TEXT DEFAULT '',   -- copia congelada de lo que se mandó en la última generación
   intentos INTEGER NOT NULL DEFAULT 0,
   version_origen_id INTEGER REFERENCES identidad_visual(id),
   creado_en TIMESTAMPTZ NOT NULL DEFAULT now(),
   actualizado_en TIMESTAMPTZ NOT NULL DEFAULT now(),
   aprobado_en TIMESTAMPTZ,
   UNIQUE(producto_id, version)
+);
+
+-- Por si la tabla ya existia de un deploy anterior a que se agregara prompt_imagen.
+ALTER TABLE identidad_visual ADD COLUMN IF NOT EXISTS prompt_imagen TEXT DEFAULT '';
+
+-- Historial de cada imagen de prueba generada dentro de un borrador de identidad_visual
+-- (no solo la ultima) — para poder comparar y volver a una anterior antes de aprobar,
+-- en vez de perderla al generar otra.
+CREATE TABLE IF NOT EXISTS identidad_visual_intentos (
+  id SERIAL PRIMARY KEY,
+  identidad_visual_id INTEGER NOT NULL REFERENCES identidad_visual(id),
+  numero INTEGER NOT NULL,
+  imagen TEXT NOT NULL,
+  prompt_usado TEXT NOT NULL,
+  creado_en TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE(identidad_visual_id, numero)
 );
 
 -- contenido_generado: Pantalla 3, generacion de copys + imagenes por pieza (todavia sin

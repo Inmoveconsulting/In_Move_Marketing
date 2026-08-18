@@ -119,4 +119,82 @@ oraciones cortas, no más) para que la respuesta no se corte, y no agregues camp
   return extractJson(text, { stopReason });
 }
 
-module.exports = { sugerirDuracion, sugerirCanales, sugerirCalendario };
+// Reglas fijas de dirección de arte para prompts de imagen — aprendidas de la práctica
+// (evitan el resultado "foto stock corporativa genérica" que suele salir de un prompt
+// ingenuo). Se aplican SIEMPRE, se pida o no explícitamente, tanto en el prompt base
+// como en el que reescribe la IA.
+const REGLAS_PROMPT_IMAGEN = `
+- Evitá la estética de foto stock genérica de "reunión corporativa" (gente sonriendo
+  mirando a cámara, poses artificiales, apretones de mano). Buscá un momento más natural
+  y de trabajo real: alguien mirando una pantalla con datos/gráficos, señalando algo
+  concreto en un documento o dashboard.
+- Incluí en algún punto de la composición un elemento visual que sugiera análisis de
+  datos o precisión (un gráfico, un dashboard, una pantalla con métricas) sin que se vea
+  forzado ni como clip art.
+- Dejá una zona de la composición con fondo liso o de bajo contraste (pared, sombra
+  suave, espacio negativo) para poder superponer un título más adelante — no la llenes
+  de detalle.
+- Dejá otra zona limpia (una esquina) para poder superponer un logo más adelante.
+- No intentes redibujar el logo de marca adjunto como referencia — usalo solo como guía
+  de paleta de colores y de tono visual. El logo real y el título se agregan aparte,
+  exactos, en un paso posterior — esta imagen es el fondo/escena.
+- Formato cuadrado, alta calidad, apto para publicar en LinkedIn e Instagram.
+`.trim();
+
+// Prompt base, sin llamar a la IA — siempre disponible apenas hay logo + estilo, para que
+// el campo nunca arranque vacío ni bloquee generar una primera imagen de prueba.
+function promptImagenBase({ perfil, estiloNombre, estiloDescripcion, notas }) {
+  return `
+Generá una imagen para contenido de marketing B2B de esta marca, en estilo ${estiloNombre.toLowerCase()}
+(${estiloDescripcion}).
+
+Tono de la marca: ${perfil.tono_voz}
+
+${REGLAS_PROMPT_IMAGEN}
+
+${notas ? `Dirección creativa adicional pedida: ${notas}` : ''}
+`.trim();
+}
+
+// Le pide a Claude que reescriba/mejore el prompt de imagen actual, incorporando el
+// perfil de marca y la dirección creativa que puso el usuario (mood, colores, qué
+// evitar, etc.) — esto es lo que reemplaza tener que armar el prompt en otro chat.
+async function sugerirPromptImagen({ perfil, estiloNombre, estiloDescripcion, notas, promptActual }) {
+  const system =
+    'Sos un director de arte experto en generar imágenes con IA para marketing B2B. Escribís prompts detallados en español para un modelo de generación de imágenes. Respondés ÚNICAMENTE con el texto final del prompt — sin explicaciones, sin comillas, sin encabezados, sin markdown, sin viñetas.';
+
+  const prompt = `
+MARCA:
+${perfil.identidad}
+
+TONO DE VOZ:
+${perfil.tono_voz}
+
+ESTILO VISUAL ELEGIDO: ${estiloNombre} — ${estiloDescripcion}
+
+DIRECCIÓN CREATIVA ADICIONAL PEDIDA POR EL USUARIO (mood, colores, qué evitar, etc.):
+${notas || '(no puso nada — usá tu criterio según el tono de marca de arriba)'}
+
+PROMPT ACTUAL (punto de partida — mejoralo, no lo repitas literal si podés hacerlo mejor):
+${promptActual || '(vacío)'}
+
+Reescribí este prompt para que sea mejor y más específico, incorporando la dirección
+creativa del usuario. Reglas fijas que SIEMPRE tenés que respetar, estén pedidas o no:
+
+${REGLAS_PROMPT_IMAGEN}
+
+Devolvé el prompt final completo, listo para usar, en español, en un solo bloque de
+texto corrido (no una lista, no viñetas, no título).
+`.trim();
+
+  const { text } = await askClaude({ system, prompt, maxTokens: 900 });
+  return text.trim();
+}
+
+module.exports = {
+  sugerirDuracion,
+  sugerirCanales,
+  sugerirCalendario,
+  promptImagenBase,
+  sugerirPromptImagen,
+};

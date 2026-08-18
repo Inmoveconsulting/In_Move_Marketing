@@ -25,11 +25,12 @@ antes de generar copys + imágenes por pieza):
 5. Mismo patrón de estado/versión que el perfil. Guarda `perfil_producto_id`: a qué versión exacta del perfil está atado.
 
 **Identidad visual** (requiere un perfil aprobado; la spec marcaba esta decisión como pendiente antes de programar la generación de imágenes):
-1. Subís hasta 3 archivos de referencia de marca: **logo** (obligatorio), y opcionalmente una captura de la landing y algo más.
-2. Elegís un **estilo** de una lista fija (fotografía realista, ilustración editorial, minimalista geométrico, collage moderno).
-3. Botón **"Generar imagen de prueba"** — llama a la API de imágenes de OpenAI (`gpt-image-1`) usando tus archivos como referencia visual, para que la imagen generada se sienta de la marca y no genérica.
-4. **"Generar otra versión"** las veces que haga falta hasta que una te convenza.
-5. **"Aprobar esta imagen como plantilla"** — congela esa versión como la plantilla de marca aprobada. Mismo patrón de estado/versión que el resto.
+1. Subís hasta 3 archivos de referencia de marca: **logo** (obligatorio), y opcionalmente una captura de la landing y algo más. Cualquier formato (SVG incluido) se convierte solo a PNG.
+2. Elegís un **estilo** de una lista fija (fotografía realista, ilustración editorial, minimalista geométrico, collage moderno, moderno y dinámico) y podés agregar una **dirección creativa** en texto libre (mood, qué evitar, colores de marca en hex).
+3. La app arma un **prompt de imagen** editable en pantalla — con reglas fijas siempre activas para evitar el look de foto stock corporativa genérica (esto es lo que antes había que resolver a mano en otro chat). Botón **"Mejorar prompt con IA"** para que Claude lo reescriba mejor según tu dirección creativa, o lo editás vos directo en el textarea.
+4. Botón **"Generar imagen de prueba"** — llama a la API de imágenes de OpenAI (`gpt-image-1`) con ese prompt + tus archivos como referencia visual.
+5. **"Generar otra versión"** las veces que haga falta — podés ajustar el prompt entre una generación y otra. Cada intento queda guardado (no solo el último): aparecen en una galería y podés volver a cualquiera con **"Usar esta versión"** antes de aprobar, sin gastar otra llamada a la IA.
+6. **"Aprobar esta imagen como plantilla"** — congela esa versión como la plantilla de marca aprobada. Mismo patrón de estado/versión que el resto.
 
 Las sugerencias de IA son eso — sugerencias. Todo queda como borrador editable y nada se aprueba solo; vos revisás y aprobás cada paso, como pide la spec.
 

@@ -47,6 +47,17 @@ async function getIdentidadVisualVersiones(productoId) {
   return rows;
 }
 
+// Todas las imagenes de prueba generadas dentro de un borrador de identidad_visual, mas
+// recientes primero — para la galeria de "volver a una version anterior".
+async function getIntentosIdentidadVisual(identidadVisualId) {
+  if (!identidadVisualId) return [];
+  const { rows } = await pool.query(
+    'SELECT * FROM identidad_visual_intentos WHERE identidad_visual_id = $1 ORDER BY numero DESC',
+    [identidadVisualId]
+  );
+  return rows;
+}
+
 module.exports = {
   getProducto,
   getPerfilVersiones,
@@ -54,4 +65,5 @@ module.exports = {
   getPerfilPorId,
   getPlanVersiones,
   getIdentidadVisualVersiones,
+  getIntentosIdentidadVisual,
 };

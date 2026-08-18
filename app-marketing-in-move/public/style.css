@@ -277,6 +277,32 @@ textarea:focus {
   margin-right: 8px;
 }
 
+.intentos-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 16px;
+  margin: 12px 0 20px;
+}
+
+.intento-card {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px;
+  text-align: center;
+}
+
+.intento-card .identidad-thumb {
+  max-width: 100%;
+  max-height: 140px;
+  margin: 0 auto 6px;
+}
+
+.intento-card button {
+  width: 100%;
+  font-size: 0.85rem;
+  padding: 6px 8px;
+}
+
 button, .inline-form input[type="text"] {
   font: inherit;
 }

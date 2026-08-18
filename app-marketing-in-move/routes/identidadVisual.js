@@ -7,8 +7,10 @@ const {
   getProducto,
   getPerfilAprobadoActual,
   getIdentidadVisualVersiones,
+  getIntentosIdentidadVisual,
 } = require('../lib/queries');
 const { generarImagenDePrueba } = require('../lib/openaiImagenes');
+const { promptImagenBase, sugerirPromptImagen } = require('../lib/sugerenciasIA');
 
 // Paso previo de la Pantalla 3 (spec sección 3): calibrar una plantilla visual de marca
 // antes de generar copys + imágenes por pieza. Sube logo + hasta 2 referencias, elegís un
@@ -35,6 +37,11 @@ const ESTILOS = [
     valor: 'collage_moderno',
     nombre: 'Collage moderno',
     descripcion: 'Mezcla de fotos, formas y texturas, más dinámico. Bueno para redes como Instagram.',
+  },
+  {
+    valor: 'moderno_dinamico',
+    nombre: 'Moderno y dinámico',
+    descripcion: 'Energía, frescura y actualidad — ángulos naturales, luz viva, sensación de movimiento. Evita la pose rígida de foto corporativa clásica.',
   },
 ];
 
@@ -72,24 +79,8 @@ async function archivoADataUri(file) {
   }
 }
 
-function construirPrompt({ perfil, estiloValor, notas }) {
-  const estilo = ESTILOS.find((e) => e.valor === estiloValor) || ESTILOS[0];
-  return `
-Generá una imagen para contenido de marketing B2B, usando el logo y las imágenes de
-referencia adjuntas como guía de identidad de marca (colores, tipografía si es visible,
-tono visual general) — la imagen nueva tiene que sentirse de la misma marca, no genérica.
-
-Contexto de la marca:
-${perfil.identidad}
-
-Tono de voz: ${perfil.tono_voz}
-
-Estilo visual pedido: ${estilo.nombre} — ${estilo.descripcion}
-${notas ? `Instrucciones adicionales del usuario: ${notas}` : ''}
-
-Formato cuadrado, alta calidad, apto para publicar en LinkedIn e Instagram. No incluyas
-texto ilegible ni deformes el logo.
-`.trim();
+function resolverEstilo(valor) {
+  return ESTILOS.find((e) => e.valor === valor) || ESTILOS[0];
 }
 
 router.use(async (req, res, next) => {
@@ -108,11 +99,13 @@ router.get('/', async (req, res, next) => {
     const perfilAprobado = await getPerfilAprobadoActual(req.producto.id);
     const versiones = await getIdentidadVisualVersiones(req.producto.id);
     const actual = versiones[0] || null;
+    const intentos = actual ? await getIntentosIdentidadVisual(actual.id) : [];
 
     res.render('identidadVisual/show', {
       producto: req.producto,
       perfilAprobado,
       iv: actual,
+      intentos,
       readonly: actual ? actual.estado === 'aprobado' : false,
       esNuevo: !actual,
       esHistorico: false,
@@ -157,20 +150,35 @@ router.post('/', camposArchivos, async (req, res, next) => {
     const estilo = (req.body.estilo || '').trim();
     const notas_estilo = (req.body.notas_estilo || '').trim();
 
+    // El prompt nunca arranca vacío: si todavía no hay uno guardado (ni editado a mano
+    // ni mejorado con IA) y ya hay estilo elegido, se completa solo con la base fija
+    // (que ya incluye las reglas para evitar el look de foto stock genérica). Si ya
+    // había un prompt guardado, no se pisa — puede tener ediciones de la usuaria.
+    let prompt_imagen = (actual && actual.prompt_imagen) || '';
+    if (!prompt_imagen && estilo) {
+      const estiloObj = resolverEstilo(estilo);
+      prompt_imagen = promptImagenBase({
+        perfil: perfilAprobado,
+        estiloNombre: estiloObj.nombre,
+        estiloDescripcion: estiloObj.descripcion,
+        notas: notas_estilo,
+      });
+    }
+
     if (!actual) {
       await pool.query(
         `INSERT INTO identidad_visual
-          (producto_id, version, estado, logo, referencia_1, referencia_2, estilo, notas_estilo)
-         VALUES ($1, 1, 'borrador', $2, $3, $4, $5, $6)`,
-        [req.producto.id, logo, referencia_1, referencia_2, estilo, notas_estilo]
+          (producto_id, version, estado, logo, referencia_1, referencia_2, estilo, notas_estilo, prompt_imagen)
+         VALUES ($1, 1, 'borrador', $2, $3, $4, $5, $6, $7)`,
+        [req.producto.id, logo, referencia_1, referencia_2, estilo, notas_estilo, prompt_imagen]
       );
     } else {
       await pool.query(
         `UPDATE identidad_visual SET
            logo = $1, referencia_1 = $2, referencia_2 = $3, estilo = $4, notas_estilo = $5,
-           actualizado_en = now()
-         WHERE id = $6`,
-        [logo, referencia_1, referencia_2, estilo, notas_estilo, actual.id]
+           prompt_imagen = $6, actualizado_en = now()
+         WHERE id = $7`,
+        [logo, referencia_1, referencia_2, estilo, notas_estilo, prompt_imagen, actual.id]
       );
     }
 
@@ -182,30 +190,83 @@ router.post('/', camposArchivos, async (req, res, next) => {
   }
 });
 
-// Generar (o regenerar) la imagen de prueba con IA.
-router.post('/generar', async (req, res, next) => {
+// Guardar edición manual del prompt de imagen.
+router.post('/prompt', async (req, res, next) => {
+  try {
+    const versiones = await getIdentidadVisualVersiones(req.producto.id);
+    const actual = versiones[0];
+    if (actual && actual.estado === 'borrador') {
+      await pool.query(
+        'UPDATE identidad_visual SET prompt_imagen = $1, actualizado_en = now() WHERE id = $2',
+        [(req.body.prompt_imagen || '').trim(), actual.id]
+      );
+    }
+    res.redirect(`/productos/${req.producto.slug}/identidad-visual`);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Mejorar el prompt con IA — esto es lo que reemplaza tener que armarlo en otro chat:
+// toma el prompt actual + el perfil de marca + la dirección creativa que puso la
+// usuaria, y lo reescribe mejor, siempre respetando las reglas fijas anti-cliché.
+router.post('/sugerir-prompt', async (req, res, next) => {
   try {
     const perfilAprobado = await getPerfilAprobadoActual(req.producto.id);
     const versiones = await getIdentidadVisualVersiones(req.producto.id);
     const actual = versiones[0];
-
-    if (!perfilAprobado || !actual || actual.estado !== 'borrador' || !actual.logo || !actual.estilo) {
+    if (!perfilAprobado || !actual || actual.estado !== 'borrador' || !actual.estilo) {
       return res.redirect(`/productos/${req.producto.slug}/identidad-visual`);
     }
-
-    const prompt = construirPrompt({
+    const estiloObj = resolverEstilo(actual.estilo);
+    const nuevoPrompt = await sugerirPromptImagen({
       perfil: perfilAprobado,
-      estiloValor: actual.estilo,
+      estiloNombre: estiloObj.nombre,
+      estiloDescripcion: estiloObj.descripcion,
       notas: actual.notas_estilo,
+      promptActual: actual.prompt_imagen,
     });
+    await pool.query(
+      'UPDATE identidad_visual SET prompt_imagen = $1, actualizado_en = now() WHERE id = $2',
+      [nuevoPrompt, actual.id]
+    );
+    res.redirect(`/productos/${req.producto.slug}/identidad-visual`);
+  } catch (err) {
+    res.redirect(
+      `/productos/${req.producto.slug}/identidad-visual?error=${encodeURIComponent('No se pudo mejorar el prompt: ' + err.message)}`
+    );
+  }
+});
+
+// Generar (o regenerar) la imagen de prueba con IA, usando el prompt guardado.
+router.post('/generar', async (req, res, next) => {
+  try {
+    const versiones = await getIdentidadVisualVersiones(req.producto.id);
+    const actual = versiones[0];
+
+    if (!actual || actual.estado !== 'borrador' || !actual.logo || !actual.prompt_imagen) {
+      return res.redirect(
+        `/productos/${req.producto.slug}/identidad-visual?error=${encodeURIComponent('Falta el logo o el prompt de imagen.')}`
+      );
+    }
+
+    const prompt = actual.prompt_imagen;
     const referencias = [actual.logo, actual.referencia_1, actual.referencia_2].filter(Boolean);
     const imagen = await generarImagenDePrueba({ prompt, referencias });
+    const nuevoNumero = actual.intentos + 1;
 
     await pool.query(
       `UPDATE identidad_visual SET
-         imagen_generada = $1, prompt_usado = $2, intentos = intentos + 1, actualizado_en = now()
-       WHERE id = $3`,
-      [imagen, prompt, actual.id]
+         imagen_generada = $1, prompt_usado = $2, intentos = $3, actualizado_en = now()
+       WHERE id = $4`,
+      [imagen, prompt, nuevoNumero, actual.id]
+    );
+    // Se guarda cada intento por separado (no solo el último) para poder compararlos y
+    // volver a uno anterior sin tener que regenerar — ver ruta /usar-intento.
+    await pool.query(
+      `INSERT INTO identidad_visual_intentos (identidad_visual_id, numero, imagen, prompt_usado)
+       VALUES ($1, $2, $3, $4)`,
+      [actual.id, nuevoNumero, imagen, prompt]
     );
 
     res.redirect(`/productos/${req.producto.slug}/identidad-visual`);
@@ -213,6 +274,37 @@ router.post('/generar', async (req, res, next) => {
     res.redirect(
       `/productos/${req.producto.slug}/identidad-visual?error=${encodeURIComponent('No se pudo generar la imagen: ' + err.message)}`
     );
+  }
+});
+
+// Volver a un intento anterior: lo convierte en la imagen (y prompt) actual del borrador,
+// sin gastar una llamada nueva a la IA. Así se puede comparar y elegir la que más gustó
+// en vez de perder las anteriores cada vez que se regenera.
+router.post('/usar-intento', async (req, res, next) => {
+  try {
+    const versiones = await getIdentidadVisualVersiones(req.producto.id);
+    const actual = versiones[0];
+    if (!actual || actual.estado !== 'borrador') {
+      return res.redirect(`/productos/${req.producto.slug}/identidad-visual`);
+    }
+    const numero = parseInt(req.body.numero, 10);
+    const { rows } = await pool.query(
+      'SELECT * FROM identidad_visual_intentos WHERE identidad_visual_id = $1 AND numero = $2',
+      [actual.id, numero]
+    );
+    const intento = rows[0];
+    if (!intento) {
+      return res.redirect(`/productos/${req.producto.slug}/identidad-visual`);
+    }
+    await pool.query(
+      `UPDATE identidad_visual SET
+         imagen_generada = $1, prompt_usado = $2, prompt_imagen = $2, actualizado_en = now()
+       WHERE id = $3`,
+      [intento.imagen, intento.prompt_usado, actual.id]
+    );
+    res.redirect(`/productos/${req.producto.slug}/identidad-visual`);
+  } catch (err) {
+    next(err);
   }
 });
 
@@ -248,8 +340,8 @@ router.post('/nueva-version', async (req, res, next) => {
     await pool.query(
       `INSERT INTO identidad_visual
         (producto_id, version, estado, logo, referencia_1, referencia_2, estilo, notas_estilo,
-         imagen_generada, prompt_usado, version_origen_id)
-       VALUES ($1, $2, 'borrador', $3, $4, $5, $6, $7, $8, $9, $10)`,
+         prompt_imagen, imagen_generada, prompt_usado, version_origen_id)
+       VALUES ($1, $2, 'borrador', $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
       [
         req.producto.id,
         nuevaVersion,
@@ -258,6 +350,7 @@ router.post('/nueva-version', async (req, res, next) => {
         actual.referencia_2,
         actual.estilo,
         actual.notas_estilo,
+        actual.prompt_imagen,
         actual.imagen_generada,
         actual.prompt_usado,
         actual.id,
@@ -287,10 +380,12 @@ router.get('/version/:v', async (req, res, next) => {
     if (!rows[0]) return res.status(404).send('Version no encontrada.');
     const versiones = await getIdentidadVisualVersiones(req.producto.id);
     const perfilAprobado = await getPerfilAprobadoActual(req.producto.id);
+    const intentos = await getIntentosIdentidadVisual(rows[0].id);
     res.render('identidadVisual/show', {
       producto: req.producto,
       perfilAprobado,
       iv: rows[0],
+      intentos,
       readonly: true,
       esNuevo: false,
       esHistorico: rows[0].version !== versiones[0].version,
