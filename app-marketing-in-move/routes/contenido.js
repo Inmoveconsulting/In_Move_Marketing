@@ -3,7 +3,12 @@ const multer = require('multer');
 const sharp = require('sharp');
 const router = express.Router({ mergeParams: true });
 const pool = require('../db/pool');
-const { getProducto, getPlanAprobadoActual, getPerfilPorId } = require('../lib/queries');
+const {
+  getProducto,
+  getPlanAprobadoActual,
+  getPerfilPorId,
+  getIdentidadVisualAprobadaActual,
+} = require('../lib/queries');
 const { sugerirCopy } = require('../lib/sugerenciasIA');
 
 // Pantalla 3 — Generación de contenido. Se genera por tramo (semana), no el plan completo
@@ -69,6 +74,7 @@ router.get('/', async (req, res, next) => {
         producto: req.producto,
         plan: null,
         semanas: [],
+        hayImagenPorDefecto: false,
         error: req.query.error || null,
       });
     }
@@ -79,6 +85,8 @@ router.get('/', async (req, res, next) => {
       'SELECT * FROM contenido_generado WHERE plan_marketing_id = $1 ORDER BY semana, canal, id',
       [plan.id]
     );
+    const identidad = await getIdentidadVisualAprobadaActual(req.producto.id);
+    const hayImagenPorDefecto = !!(identidad && (identidad.referencia_1 || identidad.logo));
 
     const semanas = [];
     for (let n = 1; n <= totalSemanas; n += 1) {
@@ -96,6 +104,7 @@ router.get('/', async (req, res, next) => {
       producto: req.producto,
       plan,
       semanas,
+      hayImagenPorDefecto,
       error: req.query.error || null,
     });
   } catch (err) {
@@ -151,6 +160,12 @@ router.post('/generar-semana', async (req, res, next) => {
     }
 
     const perfil = await getPerfilPorId(plan.perfil_producto_id);
+    // Imagen por defecto para piezas nuevas: la primera referencia de identidad visual
+    // aprobada (o el logo si no hay referencia), para que ninguna pieza arranque en
+    // blanco — se puede reemplazar por pieza igual.
+    const identidad = await getIdentidadVisualAprobadaActual(req.producto.id);
+    const imagenPorDefecto = identidad ? identidad.referencia_1 || identidad.logo || null : null;
+
     const resultados = await Promise.allSettled(
       tareas.map((canal) => sugerirCopy({ perfil, objetivoPlan: plan.objetivo, pilar, canal }))
     );
@@ -161,9 +176,9 @@ router.post('/generar-semana', async (req, res, next) => {
       if (r.status === 'fulfilled') {
         await pool.query(
           `INSERT INTO contenido_generado
-            (plan_marketing_id, perfil_producto_id, semana, canal, pilar, copy, estado)
-           VALUES ($1, $2, $3, $4, $5, $6, 'borrador')`,
-          [plan.id, plan.perfil_producto_id, numero, tareas[i], pilar.pilar, r.value]
+            (plan_marketing_id, perfil_producto_id, semana, canal, pilar, copy, imagen_ref, estado)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, 'borrador')`,
+          [plan.id, plan.perfil_producto_id, numero, tareas[i], pilar.pilar, r.value, imagenPorDefecto]
         );
       } else {
         fallos += 1;
@@ -249,6 +264,24 @@ router.post('/pieza/:id/imagen', upload.single('imagen'), async (req, res, next)
     res.redirect(
       `/productos/${req.producto.slug}/contenido?error=${encodeURIComponent(err.message)}`
     );
+  }
+});
+
+// Aplica la imagen por defecto de identidad visual a una pieza que quedó sin imagen (por
+// ejemplo, piezas generadas antes de que este atajo existiera). Sin subir archivo.
+router.post('/pieza/:id/imagen-defecto', async (req, res, next) => {
+  try {
+    const identidad = await getIdentidadVisualAprobadaActual(req.producto.id);
+    const imagen = identidad ? identidad.referencia_1 || identidad.logo || null : null;
+    if (imagen) {
+      await pool.query(
+        'UPDATE contenido_generado SET imagen_ref = $1, actualizado_en = now() WHERE id = $2',
+        [imagen, req.params.id]
+      );
+    }
+    res.redirect(`/productos/${req.producto.slug}/contenido`);
+  } catch (err) {
+    next(err);
   }
 });
 

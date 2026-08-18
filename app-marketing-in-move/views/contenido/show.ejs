@@ -25,8 +25,10 @@
   <p class="field-help">
     Se genera de a una semana por vez, no el plan completo. Cada semana usa un pilar de
     contenido distinto (rotan sobre los del plan) y genera una pieza por cada vez/semana
-    de cada canal. El copy lo escribe la IA; la imagen la subís vos a cada pieza.
-    Todo queda en borrador — todavía no hay cola de aprobación.
+    de cada canal. El copy lo escribe la IA; la imagen no — cada pieza nueva arranca con
+    una referencia de identidad visual puesta por defecto, y la podés reemplazar en las
+    piezas donde quieras algo distinto. Todo queda en borrador — todavía no hay cola de
+    aprobación.
   </p>
 
   <% semanas.forEach(function (s) { %>
@@ -59,10 +61,15 @@
               <% if (p.imagen_ref) { %>
                 <img class="identidad-thumb" src="<%= p.imagen_ref %>" alt="Imagen de la pieza">
               <% } %>
+              <% if (!p.imagen_ref && hayImagenPorDefecto) { %>
+                <form method="POST" action="/productos/<%= producto.slug %>/contenido/pieza/<%= p.id %>/imagen-defecto">
+                  <button type="submit">Usar imagen de identidad visual</button>
+                </form>
+              <% } %>
               <form method="POST" action="/productos/<%= producto.slug %>/contenido/pieza/<%= p.id %>/imagen" enctype="multipart/form-data">
                 <input type="file" name="imagen" accept="image/*">
                 <div class="form-actions">
-                  <button type="submit"><%= p.imagen_ref ? 'Reemplazar imagen' : 'Subir imagen' %></button>
+                  <button type="submit"><%= p.imagen_ref ? 'Reemplazar imagen' : 'Subir otra imagen' %></button>
                 </div>
               </form>
             </div>

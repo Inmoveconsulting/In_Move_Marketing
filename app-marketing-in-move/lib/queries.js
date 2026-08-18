@@ -58,6 +58,18 @@ async function getPlanAprobadoActual(productoId) {
   return rows[0];
 }
 
+// La identidad visual aprobada mas reciente. Se usa para poner una imagen por defecto en
+// cada pieza nueva (en vez de arrancar en blanco), aunque no es obligatoria para generar
+// contenido — a diferencia del perfil y el plan.
+async function getIdentidadVisualAprobadaActual(productoId) {
+  const { rows } = await pool.query(
+    `SELECT * FROM identidad_visual WHERE producto_id = $1 AND estado = 'aprobado'
+     ORDER BY version DESC LIMIT 1`,
+    [productoId]
+  );
+  return rows[0];
+}
+
 module.exports = {
   getProducto,
   getPerfilVersiones,
@@ -66,4 +78,5 @@ module.exports = {
   getPlanVersiones,
   getIdentidadVisualVersiones,
   getPlanAprobadoActual,
+  getIdentidadVisualAprobadaActual,
 };
