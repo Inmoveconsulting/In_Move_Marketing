@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router({ mergeParams: true });
 const pool = require('../db/pool');
 const seedTalent = require('../lib/seedTalent');
+const { getProducto, getPerfilVersiones: getVersiones } = require('../lib/queries');
 
 // Pantalla 1 — Perfil de producto.
 // Mismo patron para las tres entidades centrales: cada fila de perfiles_producto es una
@@ -18,19 +19,6 @@ const CAMPOS = [
   'ejemplos_referencia',
   'ctas_por_etapa',
 ];
-
-async function getProducto(slug) {
-  const { rows } = await pool.query('SELECT * FROM productos WHERE slug = $1', [slug]);
-  return rows[0];
-}
-
-async function getVersiones(productoId) {
-  const { rows } = await pool.query(
-    'SELECT * FROM perfiles_producto WHERE producto_id = $1 ORDER BY version DESC',
-    [productoId]
-  );
-  return rows;
-}
 
 router.use(async (req, res, next) => {
   try {
@@ -56,6 +44,7 @@ router.get('/', async (req, res, next) => {
       esHistorico: false,
       totalVersiones: versiones.length,
       puedeSeedTalent: req.producto.slug === 'talent' && versiones.length === 0,
+      hayPerfilAprobado: versiones.some((v) => v.estado === 'aprobado'),
     });
   } catch (err) {
     next(err);
@@ -218,6 +207,7 @@ router.get('/version/:v', async (req, res, next) => {
       esHistorico: rows[0].version !== versiones[0].version,
       totalVersiones: versiones.length,
       puedeSeedTalent: false,
+      hayPerfilAprobado: versiones.some((v) => v.estado === 'aprobado'),
     });
   } catch (err) {
     next(err);

@@ -29,10 +29,9 @@ CREATE TABLE IF NOT EXISTS perfiles_producto (
   UNIQUE(producto_id, version)
 );
 
--- Entidades para las pantallas 2 y 3 (todavia sin pantalla propia).
--- Se crean ahora para que el modelo de datos completo quede consistente desde el arranque
--- y las proximas pantallas no requieran migraciones nuevas.
-
+-- planes_marketing: Pantalla 2. Mismo patron de version/estado que perfiles_producto.
+-- perfil_producto_id NOT NULL obliga a que todo plan quede atado a una version aprobada
+-- de perfil especifica (trazabilidad).
 CREATE TABLE IF NOT EXISTS planes_marketing (
   id SERIAL PRIMARY KEY,
   producto_id INTEGER NOT NULL REFERENCES productos(id),
@@ -41,15 +40,22 @@ CREATE TABLE IF NOT EXISTS planes_marketing (
   estado TEXT NOT NULL DEFAULT 'borrador', -- borrador | aprobado
   objetivo TEXT NOT NULL,
   duracion_dias INTEGER,
-  duracion_razon TEXT,
-  canales JSONB NOT NULL DEFAULT '[]',
-  calendario JSONB NOT NULL DEFAULT '[]',
+  duracion_razon TEXT DEFAULT '',
+  canales JSONB NOT NULL DEFAULT '[]',      -- [{canal, veces_por_semana, dias}]
+  canales_razon TEXT DEFAULT '',
+  calendario JSONB NOT NULL DEFAULT '[]',   -- [{pilar, descripcion, cta}]
   version_origen_id INTEGER REFERENCES planes_marketing(id),
   creado_en TIMESTAMPTZ NOT NULL DEFAULT now(),
   aprobado_en TIMESTAMPTZ,
   UNIQUE(producto_id, version)
 );
 
+-- Por si la tabla ya existia de un deploy anterior a que se agregara canales_razon.
+ALTER TABLE planes_marketing ADD COLUMN IF NOT EXISTS canales_razon TEXT DEFAULT '';
+
+-- contenido_generado: Pantalla 3 (todavia sin pantalla propia). Se crea ahora para que el
+-- modelo de datos completo quede consistente desde el arranque y no haga falta una
+-- migracion cuando se construya esa pantalla.
 CREATE TABLE IF NOT EXISTS contenido_generado (
   id SERIAL PRIMARY KEY,
   plan_marketing_id INTEGER NOT NULL REFERENCES planes_marketing(id),

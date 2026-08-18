@@ -15,6 +15,8 @@ services:
         sync: false
       - key: APP_PASSWORD
         sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
 
 databases:
   - name: in-move-marketing-db

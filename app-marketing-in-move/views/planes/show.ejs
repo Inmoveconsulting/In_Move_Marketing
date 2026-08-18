@@ -1,0 +1,198 @@
+<%- include('../partials/header') %>
+
+<div class="perfil-header">
+  <div>
+    <h1>Plan de marketing</h1>
+    <% if (plan) { %>
+      <span class="badge badge-<%= plan.estado %>"><%= plan.estado === 'aprobado' ? 'Aprobado' : 'Borrador' %></span>
+      <span class="version-tag">v<%= plan.version %></span>
+      <% if (esHistorico) { %>
+        <span class="badge badge-vacio">versión histórica</span>
+      <% } %>
+    <% } else { %>
+      <span class="badge badge-vacio">Sin crear todavía</span>
+    <% } %>
+  </div>
+  <div class="perfil-actions">
+    <a href="/productos/<%= producto.slug %>/perfil">← perfil de producto</a>
+    <a href="/productos/<%= producto.slug %>/plan/historial">Ver historial<% if (totalVersiones) { %> (<%= totalVersiones %>)<% } %></a>
+  </div>
+</div>
+
+<% if (!perfilAprobado) { %>
+  <p class="callout">
+    Este producto todavía no tiene un perfil aprobado. Hace falta aprobar el perfil antes
+    de poder crear un plan de marketing —
+    <a href="/productos/<%= producto.slug %>/perfil">ir al perfil de producto</a>.
+  </p>
+<% } else { %>
+
+  <% if (error) { %>
+    <p class="callout callout-error"><%= error %></p>
+  <% } %>
+
+  <% if (!iaDisponible) { %>
+    <p class="muted small">
+      Las sugerencias automáticas están desactivadas: falta configurar <code>ANTHROPIC_API_KEY</code>
+      en las variables de entorno del servicio. Mientras tanto podés completar todo a mano.
+    </p>
+  <% } %>
+
+  <!-- Paso 1: objetivo -->
+  <section class="plan-section">
+    <h2>1. Objetivo del plan</h2>
+    <p class="field-help">
+      Obligatorio antes de seguir. Ej: instalar marca / top of mind, lanzar un producto
+      nuevo, reforzar un segmento puntual, sostener presencia.
+    </p>
+    <% if (readonly) { %>
+      <div class="field-readonly"><%= plan.objetivo %></div>
+    <% } else { %>
+      <form method="POST" action="/productos/<%= producto.slug %>/plan">
+        <textarea name="objetivo" rows="3" required><%= (plan && plan.objetivo) || '' %></textarea>
+        <div class="form-actions"><button type="submit">Guardar objetivo</button></div>
+      </form>
+    <% } %>
+  </section>
+
+  <% if (plan && plan.objetivo) { %>
+    <!-- Paso 2: duracion -->
+    <section class="plan-section">
+      <h2>2. Duración recomendada</h2>
+      <% if (readonly) { %>
+        <p><strong><%= plan.duracion_dias %> días.</strong></p>
+        <div class="field-readonly"><%= plan.duracion_razon || '—' %></div>
+      <% } else { %>
+        <% if (iaDisponible) { %>
+          <form method="POST" action="/productos/<%= producto.slug %>/plan/sugerir-duracion" class="callout">
+            <p>La IA puede sugerir la duración según el objetivo y el perfil de producto.</p>
+            <button type="submit">Sugerir duración con IA</button>
+          </form>
+        <% } %>
+        <form method="POST" action="/productos/<%= producto.slug %>/plan/duracion">
+          <div class="field">
+            <label for="duracion_dias">Duración (días)</label>
+            <input type="number" id="duracion_dias" name="duracion_dias" min="1" step="1"
+                   value="<%= (plan && plan.duracion_dias) || '' %>" style="max-width:120px">
+          </div>
+          <div class="field">
+            <label for="duracion_razon">Razón</label>
+            <textarea id="duracion_razon" name="duracion_razon" rows="3"><%= (plan && plan.duracion_razon) || '' %></textarea>
+          </div>
+          <div class="form-actions"><button type="submit">Guardar duración</button></div>
+        </form>
+      <% } %>
+    </section>
+  <% } %>
+
+  <% if (plan && plan.duracion_dias) { %>
+    <!-- Paso 3: canales -->
+    <section class="plan-section">
+      <h2>3. Canales</h2>
+      <% if (readonly) { %>
+        <ul class="canales-list">
+          <% (plan.canales || []).forEach(function (c) { %>
+            <li><strong><%= c.canal %></strong> — <%= c.veces_por_semana %>x/semana<% if (c.dias) { %> (<%= c.dias %>)<% } %></li>
+          <% }); %>
+        </ul>
+        <div class="field-readonly"><%= plan.canales_razon || '—' %></div>
+      <% } else { %>
+        <% if (iaDisponible) { %>
+          <form method="POST" action="/productos/<%= producto.slug %>/plan/sugerir-canales" class="callout">
+            <p>La IA puede sugerir qué canales usar según objetivo, perfil y público objetivo — no asume LinkedIn + Instagram de entrada.</p>
+            <button type="submit">Sugerir canales con IA</button>
+          </form>
+        <% } %>
+        <form method="POST" action="/productos/<%= producto.slug %>/plan/canales">
+          <table class="table canales-form">
+            <thead><tr><th></th><th>Canal</th><th>Veces/semana</th><th>Días</th></tr></thead>
+            <tbody>
+              <% canalesCanonicos.forEach(function (nombre) { %>
+                <%
+                  const slug = slugCanal(nombre);
+                  const entry = (plan.canales || []).find((c) => (c.canal || '').toLowerCase() === nombre.toLowerCase());
+                %>
+                <tr>
+                  <td><input type="checkbox" name="canal_<%= slug %>_usar" <%= entry ? 'checked' : '' %>></td>
+                  <td><%= nombre %></td>
+                  <td><input type="number" name="canal_<%= slug %>_veces" min="0" step="1" value="<%= entry ? entry.veces_por_semana : '' %>" style="max-width:80px"></td>
+                  <td><input type="text" name="canal_<%= slug %>_dias" value="<%= entry ? entry.dias : '' %>" placeholder="ej: lunes, miércoles"></td>
+                </tr>
+              <% }); %>
+              <%
+                const otro = (plan.canales || []).find((c) => !canalesCanonicos.some((n) => n.toLowerCase() === (c.canal || '').toLowerCase()));
+              %>
+              <tr>
+                <td></td>
+                <td><input type="text" name="canal_otro_nombre" value="<%= otro ? otro.canal : '' %>" placeholder="Otro canal"></td>
+                <td><input type="number" name="canal_otro_veces" min="0" step="1" value="<%= otro ? otro.veces_por_semana : '' %>" style="max-width:80px"></td>
+                <td><input type="text" name="canal_otro_dias" value="<%= otro ? otro.dias : '' %>"></td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="field">
+            <label for="canales_razon">Razón de la elección de canales</label>
+            <textarea id="canales_razon" name="canales_razon" rows="3"><%= plan.canales_razon || '' %></textarea>
+          </div>
+          <div class="form-actions"><button type="submit">Guardar canales</button></div>
+        </form>
+      <% } %>
+    </section>
+  <% } %>
+
+  <% if (plan && plan.canales && plan.canales.length > 0) { %>
+    <!-- Paso 4: calendario -->
+    <section class="plan-section">
+      <h2>4. Calendario — pilares de contenido</h2>
+      <% if (readonly) { %>
+        <% (plan.calendario || []).forEach(function (p) { %>
+          <div class="pilar-readonly">
+            <h3><%= p.pilar %></h3>
+            <p><%= p.descripcion %></p>
+            <p class="muted small">CTA: <%= p.cta %></p>
+          </div>
+        <% }); %>
+      <% } else { %>
+        <p class="field-help">
+          CTAs disponibles en el perfil aprobado (para copiar el texto exacto):
+          <span class="field-readonly small"><%= perfilAprobado.ctas_por_etapa %></span>
+        </p>
+        <% if (iaDisponible) { %>
+          <form method="POST" action="/productos/<%= producto.slug %>/plan/sugerir-calendario" class="callout">
+            <p>La IA puede proponer entre 3 y 6 pilares de contenido con su CTA, usando los CTAs ya definidos en el perfil.</p>
+            <button type="submit">Generar propuesta de calendario con IA</button>
+          </form>
+        <% } %>
+        <form method="POST" action="/productos/<%= producto.slug %>/plan/calendario">
+          <% for (let i = 1; i <= maxPilares; i += 1) { %>
+            <% const p = (plan.calendario || [])[i - 1] || {}; %>
+            <div class="field pilar-field">
+              <label>Pilar <%= i %></label>
+              <input type="text" name="pilar_<%= i %>_nombre" value="<%= p.pilar || '' %>" placeholder="Nombre del pilar">
+              <textarea name="pilar_<%= i %>_descripcion" rows="2" placeholder="Descripción breve"><%= p.descripcion || '' %></textarea>
+              <input type="text" name="pilar_<%= i %>_cta" value="<%= p.cta || '' %>" placeholder="CTA (o 'sin CTA duro')">
+            </div>
+          <% } %>
+          <div class="form-actions"><button type="submit">Guardar calendario</button></div>
+        </form>
+      <% } %>
+    </section>
+  <% } %>
+
+  <% if (plan && !readonly && plan.objetivo && plan.duracion_dias && plan.canales && plan.canales.length > 0 && plan.calendario && plan.calendario.length > 0) { %>
+    <form method="POST" action="/productos/<%= producto.slug %>/plan/aprobar">
+      <div class="form-actions">
+        <button type="submit" class="btn-primary">Aprobar plan</button>
+      </div>
+    </form>
+  <% } %>
+
+  <% if (readonly && !esHistorico) { %>
+    <form method="POST" action="/productos/<%= producto.slug %>/plan/nueva-version">
+      <button type="submit">Editar (crea versión nueva)</button>
+    </form>
+  <% } %>
+
+<% } %>
+
+<%- include('../partials/footer') %>

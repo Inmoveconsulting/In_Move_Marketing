@@ -105,6 +105,12 @@ h2 { font-size: 1.15rem; }
   margin-bottom: 8px;
 }
 
+.perfil-actions {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
 .perfil-actions a {
   color: var(--accent);
   text-decoration: none;
@@ -122,6 +128,68 @@ h2 { font-size: 1.15rem; }
 
 .callout button {
   margin-top: 8px;
+}
+
+.callout-error {
+  border-left-color: #b23b3b;
+  color: #8a2c2c;
+}
+
+.plan-section {
+  margin: 36px 0;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+
+.plan-section h2 {
+  margin-bottom: 4px;
+}
+
+.canales-form input[type="text"],
+.canales-form input[type="number"] {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font: inherit;
+}
+
+.canales-list {
+  padding-left: 20px;
+}
+
+.pilar-field {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 14px;
+}
+
+.pilar-field input[type="text"] {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font: inherit;
+  margin-bottom: 6px;
+}
+
+.pilar-readonly {
+  border-left: 3px solid var(--accent);
+  padding: 4px 0 4px 12px;
+  margin-bottom: 16px;
+}
+
+.pilar-readonly h3 {
+  margin: 0 0 4px;
+  font-size: 1rem;
+}
+
+.truncate {
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .field {

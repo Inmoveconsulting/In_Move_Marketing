@@ -7,6 +7,7 @@ const basicAuth = require('express-basic-auth');
 const initDb = require('./db/init');
 const productosRouter = require('./routes/productos');
 const perfilesRouter = require('./routes/perfiles');
+const planesRouter = require('./routes/planes');
 
 const app = express();
 
@@ -28,6 +29,7 @@ if (process.env.APP_USER && process.env.APP_PASSWORD) {
 
 app.use('/', productosRouter);
 app.use('/productos/:slug/perfil', perfilesRouter);
+app.use('/productos/:slug/plan', planesRouter);
 
 app.use((req, res) => {
   res.status(404).send('No encontrado.');

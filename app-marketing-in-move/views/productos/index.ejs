@@ -14,7 +14,12 @@
       <% } else { %>
         <span class="badge badge-vacio">Sin perfil todavía</span>
       <% } %>
-      <p class="muted small"><%= p.total_versiones %> versión(es)</p>
+      <% if (p.estado_plan) { %>
+        <span class="badge badge-<%= p.estado_plan %>">
+          <%= p.estado_plan === 'aprobado' ? 'Plan aprobado' : 'Plan en borrador' %>
+        </span>
+      <% } %>
+      <p class="muted small"><%= p.total_versiones %> versión(es) de perfil</p>
     </a>
   <% }); %>
 </div>

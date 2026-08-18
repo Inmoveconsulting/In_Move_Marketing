@@ -6,15 +6,25 @@ No comparte código, base de datos ni configuración con esa app — no la toca.
 
 ## Estado actual
 
-Solo está construida la **Pantalla 1 — Perfil de producto**:
+Están construidas la **Pantalla 1 — Perfil de producto** y la **Pantalla 2 — Plan de Marketing**:
 
+**Pantalla 1:**
 - Selector de producto (pantalla 0) con alta de productos nuevos.
 - Formulario de los 8 campos del perfil.
 - Estado borrador / aprobado, con versionado (aprobar congela; editar un aprobado crea versión nueva).
 - Historial de versiones.
 - Botón para cargar el perfil real de In Move Talent (v1.1, ya aprobado) y probar la pantalla con datos reales sin tipear todo a mano.
 
-Generación de contenido, cola de aprobación, publicación y medición (pantallas 3 a 6) **todavía no están construidas**. El modelo de datos ya tiene las tablas `planes_marketing` y `contenido_generado` creadas desde ahora, para que cuando se construyan esas pantallas no haga falta una migración — pero no tienen ninguna pantalla todavía.
+**Pantalla 2** (requiere un perfil aprobado — si no hay ninguno, te manda de vuelta a la Pantalla 1):
+1. **Objetivo del plan** — campo obligatorio, bloquea el resto hasta completarlo.
+2. **Duración recomendada** — botón "Sugerir duración con IA" (llama a la API de Claude con el perfil + el objetivo) o carga manual. Editable siempre, aceptar o ajustar.
+3. **Canales** — botón "Sugerir canales con IA" (no asume LinkedIn + Instagram de entrada, decide según objetivo/perfil/público) o selección manual con checkboxes + frecuencia por canal.
+4. **Calendario (pilares de contenido)** — botón "Generar propuesta con IA" (usa los CTAs ya definidos en el perfil, no inventa nuevos) o carga manual de hasta 6 pilares.
+5. Mismo patrón de estado/versión que el perfil. Guarda `perfil_producto_id`: a qué versión exacta del perfil está atado.
+
+Las sugerencias de IA son eso — sugerencias. Todo queda como borrador editable y nada se aprueba solo; vos revisás y aprobás cada paso, como pide la spec.
+
+Generación de contenido, cola de aprobación, publicación y medición (pantallas 3 a 6) **todavía no están construidas**. El modelo de datos ya tiene la tabla `contenido_generado` creada desde ahora, para que cuando se construya esa pantalla no haga falta una migración.
 
 ## Stack (por qué esto y no otra cosa)
 
@@ -29,15 +39,19 @@ Es deliberadamente aburrido: la prioridad que pediste fue simplicidad y que lo p
 
 ```
 app-marketing-in-move/
-  server.js              punto de entrada
-  db/schema.sql           tablas (se crean solas al arrancar, sin pasos manuales)
-  db/pool.js, db/init.js  conexión y arranque de la base
-  routes/productos.js     selector de producto (pantalla 0)
-  routes/perfiles.js      perfil de producto (pantalla 1)
-  lib/seedTalent.js       datos reales de In Move Talent v1.1, para el botón "cargar ejemplo"
-  views/                  plantillas EJS
-  public/style.css        estilos
-  render.yaml             config para que Render cree el servicio + la base con un click
+  server.js               punto de entrada
+  db/schema.sql            tablas (se crean/actualizan solas al arrancar, sin pasos manuales)
+  db/pool.js, db/init.js   conexión y arranque de la base
+  routes/productos.js      selector de producto (pantalla 0)
+  routes/perfiles.js       perfil de producto (pantalla 1)
+  routes/planes.js         plan de marketing (pantalla 2)
+  lib/seedTalent.js        datos reales de In Move Talent v1.1, para el botón "cargar ejemplo"
+  lib/queries.js           consultas SQL compartidas entre pantallas
+  lib/claude.js            cliente minimo de la API de Claude (sin SDK, un fetch)
+  lib/sugerenciasIA.js     los 3 prompts de IA de la pantalla 2 (duración, canales, calendario)
+  views/                   plantillas EJS
+  public/style.css         estilos
+  render.yaml              config para que Render cree el servicio + la base con un click
 ```
 
 ## Modelo de datos
@@ -48,17 +62,18 @@ app-marketing-in-move/
 `version_origen_id` apunta a la fila anterior de la que salió (cuando editás un perfil aprobado,
 no se pisa: se crea una fila nueva con este puntero). `aprobado_en` queda vacío hasta que se aprueba.
 
-**planes_marketing** *(tabla creada, sin pantalla todavía)* — igual patrón de versión/estado.
-Referencia obligatoria a `perfil_producto_id`: no puede existir un plan sin decir qué versión
-de qué perfil usó, como pide la especificación.
+**planes_marketing** — mismo patrón de versión/estado que el perfil. `perfil_producto_id` es
+obligatorio: no puede existir un plan sin decir qué versión exacta de qué perfil usó. Guarda
+objetivo, duración (+ razón), canales (+ razón) y calendario de pilares — todo editable hasta
+que se aprueba.
 
-**contenido_generado** *(tabla creada, sin pantalla todavía)* — cada pieza referencia el plan
-y la versión de perfil que la generó, con su propio estado (`borrador` → ... → `publicado`) y
-`version_origen_id` para cuando una pieza se regenera por feedback.
+**contenido_generado** *(tabla creada, sin pantalla todavía — pantalla 3)* — cada pieza
+referencia el plan y la versión de perfil que la generó, con su propio estado
+(`borrador` → ... → `publicado`) y `version_origen_id` para cuando una pieza se regenera
+por feedback.
 
-Este esqueleto ya cubre la trazabilidad completa que pide la spec ("todo objeto lleva versión
-y trazabilidad de qué versión de qué otro objeto lo originó"), aunque hoy solo la Pantalla 1
-tenga interfaz.
+Este esqueleto ya cubre la trazabilidad completa que pide la spec: "todo objeto lleva versión
+y trazabilidad de qué versión de qué otro objeto lo originó".
 
 ---
 
@@ -89,9 +104,11 @@ Listo, el repo ya tiene el código.
 2. En el dashboard, **New +** → **Blueprint**.
 3. Conectá el repo `in-move-marketing` que acabás de crear (Render te va a pedir autorizar
    acceso a GitHub la primera vez, si no lo hiciste ya para la otra app).
+
 4. Render va a leer el archivo `render.yaml` del repo y te va a mostrar que va a crear:
    - un **Web Service** llamado `in-move-marketing`
    - una **base de datos PostgreSQL** llamada `in-move-marketing-db`
+
 5. Confirmá la creación ("Apply"). Render construye y despliega solo — no hace falta que
    toques nada más. Esto tarda unos minutos la primera vez.
 6. Cuando termine, Render te da una URL tipo `in-move-marketing.onrender.com`. Esa es tu app.
@@ -120,14 +137,34 @@ agregá:
 
 Guardá — Render redespliega solo y a partir de ahí el navegador va a pedir esas credenciales.
 
+### API key de Claude (necesaria para las sugerencias de IA de la Pantalla 2)
+
+Sin esto, la Pantalla 2 funciona igual pero sin los botones de sugerencia automática —
+completás objetivo, duración, canales y calendario a mano.
+
+1. Andá a [console.anthropic.com](https://console.anthropic.com), entrá con tu cuenta (o
+   creá una) y generá una API key nueva (sección "API Keys").
+2. En Render, entrá al servicio `in-move-marketing` → pestaña **Environment**.
+3. Agregá la variable `ANTHROPIC_API_KEY` con el valor que copiaste.
+4. Guardá — redespliega solo.
+
+Esta key es de la cuenta de Anthropic/API, **distinta** de tu cuenta de Claude.ai o de esta
+sesión de Claude Code. El uso de la API se cobra aparte (por uso, muy bajo costo para el
+volumen de esta app — cada sugerencia es una sola llamada corta).
+
+Variable opcional: `CLAUDE_MODEL` (por defecto usa `claude-sonnet-5`) si en algún momento
+querés apuntar a otro modelo.
+
 ## Cómo actualizar la app en el futuro (mismo mecanismo que ya usás)
 
 Cuando te dé archivos nuevos o modificados:
 
-1. Entrá al repo en GitHub.
+1. Entrá al repo en GitHub, dentro de la carpeta `app-marketing-in-move`.
 2. **Add file** → **Upload files**, arrastrá los archivos que cambiaron (podés subir solo
    los que cambiaron, o toda la carpeta de nuevo — GitHub sobreescribe lo que coincide en
-   nombre y ruta).
+   nombre y ruta). Si te doy un archivo nuevo dentro de una carpeta que ya existe (por
+   ejemplo `lib/claude.js`), asegurate de subirlo dentro de esa misma carpeta en el repo,
+   no en la raíz.
 3. Commit changes.
 4. Render detecta el push al repo y **redespliega solo**, sin que tengas que entrar a Render
    para nada — igual que ya te pasa con la otra app.
@@ -149,8 +186,27 @@ Cuando te dé archivos nuevos o modificados:
    completar su perfil a mano, campo por campo, para probar el caso de un perfil armado
    desde cero.
 
+## Cómo probar la Pantalla 2 con datos reales
+
+1. Con el perfil de In Move Talent aprobado (paso anterior), entrá a "In Move Talent" y
+   tocá **"Ir al plan de marketing →"** (aparece junto a "Ver historial" en la Pantalla 1).
+2. Escribí un objetivo, por ejemplo el mismo del plan de ejemplo que me diste: *"Presencia
+   sostenida — top of mind, no conversión directa."* Guardalo.
+3. Tocá **"Sugerir duración con IA"** (necesita `ANTHROPIC_API_KEY` configurada — ver más
+   arriba) y mirá qué te devuelve y por qué. Ajustá el número si no estás de acuerdo, y
+   guardá.
+4. Tocá **"Sugerir canales con IA"** — comparalo con lo que ya se había decidido a mano en
+   el plan de ejemplo (LinkedIn + Instagram). Ajustá los checkboxes/frecuencias si hace
+   falta, y guardá.
+5. Tocá **"Generar propuesta de calendario con IA"** — mirá si los pilares y los CTAs que
+   propone tienen sentido contra los 4 pilares del plan de ejemplo y los CTAs del perfil.
+   Editá lo que haga falta, y guardá.
+6. Con las 4 secciones completas, **Aprobá el plan** y confirmá en **Ver historial** que
+   quedó versionado igual que el perfil.
+
 ## Qué sigue (no construido todavía)
 
-Pantalla 2 (Plan de marketing, con duración configurable — no fija a 30 días), generación
-de contenido, cola de aprobación y publicación. Eso arranca después de que confirmes que
-esta pantalla funciona como esperás.
+Generación de contenido (copys e imágenes), cola de aprobación y publicación (pantallas 3
+a 5), y medición con recomendación de próximo plan (pantalla 6). La generación de imágenes
+tiene una decisión pendiente marcada en la spec (IA de imágenes vs. plantillas tipo Canva)
+que conviene resolver antes de programar esa parte.

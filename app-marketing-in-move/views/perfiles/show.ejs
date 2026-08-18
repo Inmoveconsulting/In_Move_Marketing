@@ -15,6 +15,9 @@
   </div>
   <div class="perfil-actions">
     <a href="/productos/<%= producto.slug %>/perfil/historial">Ver historial<% if (totalVersiones) { %> (<%= totalVersiones %>)<% } %></a>
+    <% if (hayPerfilAprobado) { %>
+      <a href="/productos/<%= producto.slug %>/plan">Ir al plan de marketing →</a>
+    <% } %>
   </div>
 </div>
 

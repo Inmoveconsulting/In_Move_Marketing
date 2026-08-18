@@ -9,7 +9,8 @@ router.get('/', async (req, res, next) => {
     const { rows: productos } = await pool.query(
       `SELECT p.*,
         (SELECT COUNT(*) FROM perfiles_producto pp WHERE pp.producto_id = p.id)::int AS total_versiones,
-        (SELECT estado FROM perfiles_producto pp WHERE pp.producto_id = p.id ORDER BY version DESC LIMIT 1) AS estado_perfil
+        (SELECT estado FROM perfiles_producto pp WHERE pp.producto_id = p.id ORDER BY version DESC LIMIT 1) AS estado_perfil,
+        (SELECT estado FROM planes_marketing pm WHERE pm.producto_id = p.id ORDER BY version DESC LIMIT 1) AS estado_plan
        FROM productos p
        WHERE p.estado = 'activo'
        ORDER BY p.creado_en ASC`
