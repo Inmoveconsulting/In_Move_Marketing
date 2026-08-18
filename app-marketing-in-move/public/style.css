@@ -292,6 +292,11 @@ button {
 
 button:hover { border-color: var(--accent); }
 
+button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
 button.btn-primary {
   background: var(--accent);
   color: var(--accent-contrast);
