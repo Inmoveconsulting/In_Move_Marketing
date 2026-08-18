@@ -39,10 +39,19 @@ async function getPlanVersiones(productoId) {
   return rows;
 }
 
+async function getIdentidadVisualVersiones(productoId) {
+  const { rows } = await pool.query(
+    'SELECT * FROM identidad_visual WHERE producto_id = $1 ORDER BY version DESC',
+    [productoId]
+  );
+  return rows;
+}
+
 module.exports = {
   getProducto,
   getPerfilVersiones,
   getPerfilAprobadoActual,
   getPerfilPorId,
   getPlanVersiones,
+  getIdentidadVisualVersiones,
 };

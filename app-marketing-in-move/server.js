@@ -8,6 +8,7 @@ const initDb = require('./db/init');
 const productosRouter = require('./routes/productos');
 const perfilesRouter = require('./routes/perfiles');
 const planesRouter = require('./routes/planes');
+const identidadVisualRouter = require('./routes/identidadVisual');
 
 const app = express();
 
@@ -30,6 +31,7 @@ if (process.env.APP_USER && process.env.APP_PASSWORD) {
 app.use('/', productosRouter);
 app.use('/productos/:slug/perfil', perfilesRouter);
 app.use('/productos/:slug/plan', planesRouter);
+app.use('/productos/:slug/identidad-visual', identidadVisualRouter);
 
 app.use((req, res) => {
   res.status(404).send('No encontrado.');

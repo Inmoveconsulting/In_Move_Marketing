@@ -6,7 +6,9 @@ No comparte código, base de datos ni configuración con esa app — no la toca.
 
 ## Estado actual
 
-Están construidas la **Pantalla 1 — Perfil de producto** y la **Pantalla 2 — Plan de Marketing**:
+Están construidas la **Pantalla 1 — Perfil de producto**, la **Pantalla 2 — Plan de Marketing**
+y el paso previo de la **Pantalla 3 — Identidad visual** (calibración de la plantilla visual,
+antes de generar copys + imágenes por pieza):
 
 **Pantalla 1:**
 - Selector de producto (pantalla 0) con alta de productos nuevos.
@@ -22,9 +24,16 @@ Están construidas la **Pantalla 1 — Perfil de producto** y la **Pantalla 2 �
 4. **Calendario (pilares de contenido)** — botón "Generar propuesta con IA" (usa los CTAs ya definidos en el perfil, no inventa nuevos) o carga manual de hasta 6 pilares.
 5. Mismo patrón de estado/versión que el perfil. Guarda `perfil_producto_id`: a qué versión exacta del perfil está atado.
 
+**Identidad visual** (requiere un perfil aprobado; la spec marcaba esta decisión como pendiente antes de programar la generación de imágenes):
+1. Subís hasta 3 archivos de referencia de marca: **logo** (obligatorio), y opcionalmente una captura de la landing y algo más.
+2. Elegís un **estilo** de una lista fija (fotografía realista, ilustración editorial, minimalista geométrico, collage moderno).
+3. Botón **"Generar imagen de prueba"** — llama a la API de imágenes de OpenAI (`gpt-image-1`) usando tus archivos como referencia visual, para que la imagen generada se sienta de la marca y no genérica.
+4. **"Generar otra versión"** las veces que haga falta hasta que una te convenza.
+5. **"Aprobar esta imagen como plantilla"** — congela esa versión como la plantilla de marca aprobada. Mismo patrón de estado/versión que el resto.
+
 Las sugerencias de IA son eso — sugerencias. Todo queda como borrador editable y nada se aprueba solo; vos revisás y aprobás cada paso, como pide la spec.
 
-Generación de contenido, cola de aprobación, publicación y medición (pantallas 3 a 6) **todavía no están construidas**. El modelo de datos ya tiene la tabla `contenido_generado` creada desde ahora, para que cuando se construya esa pantalla no haga falta una migración.
+Generación de copys + imágenes por pieza, cola de aprobación, publicación y medición (el resto de la Pantalla 3 y las pantallas 4 a 6) **todavía no están construidas**. El modelo de datos ya tiene la tabla `contenido_generado` creada desde ahora, para que cuando se construya esa parte no haga falta una migración.
 
 ## Stack (por qué esto y no otra cosa)
 
@@ -45,10 +54,12 @@ app-marketing-in-move/
   routes/productos.js      selector de producto (pantalla 0)
   routes/perfiles.js       perfil de producto (pantalla 1)
   routes/planes.js         plan de marketing (pantalla 2)
+  routes/identidadVisual.js identidad visual — paso previo de la pantalla 3
   lib/seedTalent.js        datos reales de In Move Talent v1.1, para el botón "cargar ejemplo"
   lib/queries.js           consultas SQL compartidas entre pantallas
   lib/claude.js            cliente minimo de la API de Claude (sin SDK, un fetch)
   lib/sugerenciasIA.js     los 3 prompts de IA de la pantalla 2 (duración, canales, calendario)
+  lib/openaiImagenes.js    cliente minimo de la API de imágenes de OpenAI (gpt-image-1)
   views/                   plantillas EJS
   public/style.css         estilos
   render.yaml              config para que Render cree el servicio + la base con un click
@@ -67,8 +78,13 @@ obligatorio: no puede existir un plan sin decir qué versión exacta de qué per
 objetivo, duración (+ razón), canales (+ razón) y calendario de pilares — todo editable hasta
 que se aprueba.
 
-**contenido_generado** *(tabla creada, sin pantalla todavía — pantalla 3)* — cada pieza
-referencia el plan y la versión de perfil que la generó, con su propio estado
+**identidad_visual** — mismo patrón de versión/estado. Guarda logo + hasta 2 referencias
+(como data URI base64 — a esta escala no justifica un storage externo tipo S3), el estilo
+elegido, y la imagen de prueba generada (se sobreescribe en cada regeneración mientras está
+en borrador). `intentos` cuenta cuántas veces se regeneró, solo informativo.
+
+**contenido_generado** *(tabla creada, sin pantalla todavía — resto de la pantalla 3)* — cada
+pieza referencia el plan y la versión de perfil que la generó, con su propio estado
 (`borrador` → ... → `publicado`) y `version_origen_id` para cuando una pieza se regenera
 por feedback.
 
@@ -155,6 +171,22 @@ volumen de esta app — cada sugerencia es una sola llamada corta).
 Variable opcional: `CLAUDE_MODEL` (por defecto usa `claude-sonnet-5`) si en algún momento
 querés apuntar a otro modelo.
 
+### API key de OpenAI (necesaria para generar imágenes en Identidad visual)
+
+Ni Claude ni la API de Anthropic generan imágenes — para eso la app usa la API de imágenes
+de OpenAI (`gpt-image-1`), que es una cuenta y una key totalmente aparte.
+
+Sin esto, la pantalla de Identidad visual funciona igual para subir archivos y elegir
+estilo, pero no vas a poder generar la imagen de prueba.
+
+1. Andá a [platform.openai.com](https://platform.openai.com), entrá con tu cuenta (o creá
+   una) y generá una API key nueva (sección "API keys").
+2. Puede que te pida cargar un medio de pago antes de dejarte usar la API de imágenes —
+   es una cuenta de pago por uso, separada de todo lo demás.
+3. En Render, entrá al servicio `in-move-marketing` → pestaña **Environment**.
+4. Agregá la variable `OPENAI_API_KEY` con el valor que copiaste.
+5. Guardá — redespliega solo.
+
 ## Cómo actualizar la app en el futuro (mismo mecanismo que ya usás)
 
 Cuando te dé archivos nuevos o modificados:
@@ -204,9 +236,23 @@ Cuando te dé archivos nuevos o modificados:
 6. Con las 4 secciones completas, **Aprobá el plan** y confirmá en **Ver historial** que
    quedó versionado igual que el perfil.
 
+## Cómo probar Identidad visual con datos reales
+
+1. Con el perfil de In Move Talent aprobado, entrá a "In Move Talent" y tocá **"Ir a
+   identidad visual →"** (junto a "Ver historial" en la Pantalla 1).
+2. Subí el logo de In Move (obligatorio), y si tenés a mano una captura de la landing o de
+   la demo, subila como referencia 1.
+3. Elegí un estilo de la lista (para un producto B2B serio, "Fotografía realista
+   corporativa" o "Minimalista geométrico" son buenos puntos de partida) y guardá.
+4. Tocá **"Generar imagen de prueba"** (necesita `OPENAI_API_KEY` configurada — ver más
+   arriba). Tarda unos segundos.
+5. Si no te convence, tocá **"Generar otra versión"** las veces que haga falta — podés
+   cambiar el estilo o las instrucciones adicionales antes de volver a generar.
+6. Cuando una te convenza, **"Aprobar esta imagen como plantilla"**.
+
 ## Qué sigue (no construido todavía)
 
-Generación de contenido (copys e imágenes), cola de aprobación y publicación (pantallas 3
-a 5), y medición con recomendación de próximo plan (pantalla 6). La generación de imágenes
-tiene una decisión pendiente marcada en la spec (IA de imágenes vs. plantillas tipo Canva)
-que conviene resolver antes de programar esa parte.
+El resto de la Pantalla 3: generación de copys + imagen por pieza (por tramo, no el plan
+completo de una), usando el perfil + la fila del calendario correspondiente + la plantilla
+visual aprobada como contexto. Después, cola de aprobación y publicación (pantallas 4 y 5),
+y medición con recomendación de próximo plan (pantalla 6).

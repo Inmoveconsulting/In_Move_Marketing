@@ -53,9 +53,34 @@ CREATE TABLE IF NOT EXISTS planes_marketing (
 -- Por si la tabla ya existia de un deploy anterior a que se agregara canales_razon.
 ALTER TABLE planes_marketing ADD COLUMN IF NOT EXISTS canales_razon TEXT DEFAULT '';
 
--- contenido_generado: Pantalla 3 (todavia sin pantalla propia). Se crea ahora para que el
--- modelo de datos completo quede consistente desde el arranque y no haga falta una
--- migracion cuando se construya esa pantalla.
+-- identidad_visual: paso previo de la Pantalla 3, antes de generar copys + imagenes.
+-- Calibra una plantilla visual de marca (logo + hasta 2 referencias + estilo elegido)
+-- generando imagenes de prueba con IA hasta aprobar una. Mismo patron de version/estado
+-- que el resto. Las imagenes se guardan como data URI base64 en TEXT — a esta escala
+-- (un puñado de imagenes por producto) no justifica sumar un storage externo (S3, etc.).
+CREATE TABLE IF NOT EXISTS identidad_visual (
+  id SERIAL PRIMARY KEY,
+  producto_id INTEGER NOT NULL REFERENCES productos(id),
+  version INTEGER NOT NULL,
+  estado TEXT NOT NULL DEFAULT 'borrador', -- borrador | aprobado
+  logo TEXT,
+  referencia_1 TEXT,
+  referencia_2 TEXT,
+  estilo TEXT DEFAULT '',
+  notas_estilo TEXT DEFAULT '',
+  imagen_generada TEXT,
+  prompt_usado TEXT DEFAULT '',
+  intentos INTEGER NOT NULL DEFAULT 0,
+  version_origen_id INTEGER REFERENCES identidad_visual(id),
+  creado_en TIMESTAMPTZ NOT NULL DEFAULT now(),
+  actualizado_en TIMESTAMPTZ NOT NULL DEFAULT now(),
+  aprobado_en TIMESTAMPTZ,
+  UNIQUE(producto_id, version)
+);
+
+-- contenido_generado: Pantalla 3, generacion de copys + imagenes por pieza (todavia sin
+-- pantalla propia). Se crea ahora para que el modelo de datos completo quede consistente
+-- desde el arranque y no haga falta una migracion cuando se construya esa parte.
 CREATE TABLE IF NOT EXISTS contenido_generado (
   id SERIAL PRIMARY KEY,
   plan_marketing_id INTEGER NOT NULL REFERENCES planes_marketing(id),

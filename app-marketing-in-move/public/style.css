@@ -238,6 +238,45 @@ textarea:focus {
   margin-top: 28px;
 }
 
+.identidad-grid {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin: 12px 0 20px;
+}
+
+.identidad-thumb {
+  display: block;
+  max-width: 160px;
+  max-height: 160px;
+  object-fit: contain;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card-bg);
+  padding: 6px;
+  margin: 6px 0;
+}
+
+.identidad-preview {
+  display: block;
+  max-width: 420px;
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin: 16px 0;
+}
+
+.estilo-opcion {
+  display: block;
+  font-weight: 400;
+  margin: 8px 0;
+  cursor: pointer;
+}
+
+.estilo-opcion input {
+  margin-right: 8px;
+}
+
 button, .inline-form input[type="text"] {
   font: inherit;
 }

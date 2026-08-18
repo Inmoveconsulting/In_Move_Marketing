@@ -1,0 +1,133 @@
+<%- include('../partials/header') %>
+
+<div class="perfil-header">
+  <div>
+    <h1>Identidad visual</h1>
+    <% if (iv) { %>
+      <span class="badge badge-<%= iv.estado %>"><%= iv.estado === 'aprobado' ? 'Aprobado' : 'Borrador' %></span>
+      <span class="version-tag">v<%= iv.version %></span>
+      <% if (esHistorico) { %>
+        <span class="badge badge-vacio">versión histórica</span>
+      <% } %>
+    <% } else { %>
+      <span class="badge badge-vacio">Sin crear todavía</span>
+    <% } %>
+  </div>
+  <div class="perfil-actions">
+    <a href="/productos/<%= producto.slug %>/perfil">← perfil de producto</a>
+    <a href="/productos/<%= producto.slug %>/identidad-visual/historial">Ver historial<% if (totalVersiones) { %> (<%= totalVersiones %>)<% } %></a>
+  </div>
+</div>
+
+<% if (!perfilAprobado) { %>
+  <p class="callout">
+    Este producto todavía no tiene un perfil aprobado. Hace falta aprobar el perfil antes
+    de calibrar la identidad visual —
+    <a href="/productos/<%= producto.slug %>/perfil">ir al perfil de producto</a>.
+  </p>
+<% } else { %>
+
+  <% if (error) { %>
+    <p class="callout callout-error"><%= error %></p>
+  <% } %>
+
+  <% if (!iaDisponible) { %>
+    <p class="muted small">
+      La generación de imágenes está desactivada: falta configurar <code>OPENAI_API_KEY</code>
+      en las variables de entorno del servicio. Mientras tanto podés subir los archivos y
+      elegir el estilo, pero no vas a poder generar la imagen de prueba.
+    </p>
+  <% } %>
+
+  <p class="field-help">
+    Subí hasta 3 archivos que definan la identidad de marca (logo obligatorio; captura de la
+    landing y algo más, opcionales) y elegí un estilo. La IA va a generar una imagen de
+    prueba usando esos archivos como referencia — la podés regenerar las veces que haga
+    falta hasta aprobar una plantilla.
+  </p>
+
+  <% if (readonly) { %>
+    <div class="identidad-grid">
+      <div>
+        <p class="muted small">Logo</p>
+        <% if (iv.logo) { %><img class="identidad-thumb" src="<%= iv.logo %>" alt="Logo"><% } %>
+      </div>
+      <% if (iv.referencia_1) { %>
+        <div><p class="muted small">Referencia 1</p><img class="identidad-thumb" src="<%= iv.referencia_1 %>" alt="Referencia 1"></div>
+      <% } %>
+      <% if (iv.referencia_2) { %>
+        <div><p class="muted small">Referencia 2</p><img class="identidad-thumb" src="<%= iv.referencia_2 %>" alt="Referencia 2"></div>
+      <% } %>
+    </div>
+    <p><strong>Estilo:</strong> <%= (estilos.find((e) => e.valor === iv.estilo) || {}).nombre || iv.estilo %></p>
+    <% if (iv.notas_estilo) { %><div class="field-readonly"><%= iv.notas_estilo %></div><% } %>
+  <% } else { %>
+    <form method="POST" action="/productos/<%= producto.slug %>/identidad-visual" enctype="multipart/form-data">
+      <div class="field">
+        <label for="logo">Logo (obligatorio)</label>
+        <% if (iv && iv.logo) { %><img class="identidad-thumb" src="<%= iv.logo %>" alt="Logo actual"><% } %>
+        <input type="file" id="logo" name="logo" accept="image/*">
+      </div>
+      <div class="field">
+        <label for="referencia_1">Referencia 1 — ej: captura de la landing</label>
+        <% if (iv && iv.referencia_1) { %><img class="identidad-thumb" src="<%= iv.referencia_1 %>" alt="Referencia 1 actual"><% } %>
+        <input type="file" id="referencia_1" name="referencia_1" accept="image/*">
+      </div>
+      <div class="field">
+        <label for="referencia_2">Referencia 2 — opcional</label>
+        <% if (iv && iv.referencia_2) { %><img class="identidad-thumb" src="<%= iv.referencia_2 %>" alt="Referencia 2 actual"><% } %>
+        <input type="file" id="referencia_2" name="referencia_2" accept="image/*">
+      </div>
+
+      <div class="field">
+        <label>Estilo</label>
+        <% estilos.forEach(function (e) { %>
+          <label class="estilo-opcion">
+            <input type="radio" name="estilo" value="<%= e.valor %>" <%= iv && iv.estilo === e.valor ? 'checked' : '' %>>
+            <strong><%= e.nombre %></strong> — <span class="muted small"><%= e.descripcion %></span>
+          </label>
+        <% }); %>
+      </div>
+
+      <div class="field">
+        <label for="notas_estilo">Instrucciones adicionales (opcional)</label>
+        <textarea id="notas_estilo" name="notas_estilo" rows="2"><%= (iv && iv.notas_estilo) || '' %></textarea>
+      </div>
+
+      <div class="form-actions"><button type="submit">Guardar identidad visual</button></div>
+    </form>
+
+    <% if (iv && iv.logo && iv.estilo) { %>
+      <section class="plan-section">
+        <% if (iaDisponible) { %>
+          <form method="POST" action="/productos/<%= producto.slug %>/identidad-visual/generar">
+            <button type="submit">
+              <%= iv.imagen_generada ? 'Generar otra versión' : 'Generar imagen de prueba' %>
+            </button>
+          </form>
+        <% } %>
+        <% if (iv.intentos > 0) { %>
+          <p class="muted small">Intentos de generación: <%= iv.intentos %></p>
+        <% } %>
+
+        <% if (iv.imagen_generada) { %>
+          <img class="identidad-preview" src="<%= iv.imagen_generada %>" alt="Imagen de prueba generada">
+          <form method="POST" action="/productos/<%= producto.slug %>/identidad-visual/aprobar">
+            <div class="form-actions">
+              <button type="submit" class="btn-primary">Aprobar esta imagen como plantilla</button>
+            </div>
+          </form>
+        <% } %>
+      </section>
+    <% } %>
+  <% } %>
+
+  <% if (readonly && !esHistorico) { %>
+    <form method="POST" action="/productos/<%= producto.slug %>/identidad-visual/nueva-version">
+      <button type="submit">Editar (crea versión nueva)</button>
+    </form>
+  <% } %>
+
+<% } %>
+
+<%- include('../partials/footer') %>
