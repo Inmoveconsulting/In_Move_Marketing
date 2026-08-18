@@ -43,11 +43,12 @@ instalar marca / top of mind pide más tiempo (por ejemplo 90 días) que un lanz
 puntual (por ejemplo 30 días) o reforzar un segmento específico. Usá criterio según el
 objetivo de arriba, no repitas siempre el mismo número.
 
-Respondé con este JSON exacto, sin nada más alrededor:
-{"duracion_dias": <número entero>, "razon": "<2 a 4 oraciones explicando por qué>"}
+Respondé con este JSON exacto, sin nada más alrededor. Sé breve en "razon" (2 a 3
+oraciones cortas, no más) para que la respuesta no se corte:
+{"duracion_dias": <número entero>, "razon": "<2 a 3 oraciones breves explicando por qué>"}
 `.trim();
 
-  const text = await askClaude({ system: SYSTEM, prompt, maxTokens: 500 });
+  const text = await askClaude({ system: SYSTEM, prompt, maxTokens: 600 });
   return extractJson(text);
 }
 
@@ -69,16 +70,17 @@ Elegí canales de esta lista cuando corresponda (podés no usar todos, y podés 
 canal fuera de esta lista si tiene más sentido para este caso):
 LinkedIn, Instagram, Facebook, TikTok, YouTube, Email
 
-Respondé con este JSON exacto, sin nada más alrededor:
+Respondé con este JSON exacto, sin nada más alrededor. Sé breve en "razon_general" (2 a 3
+oraciones cortas, no más) para que la respuesta no se corte, y no agregues campos extra:
 {
-  "razon_general": "<2 a 4 oraciones explicando la elección de canales>",
+  "razon_general": "<2 a 3 oraciones breves explicando la elección de canales>",
   "canales": [
     {"canal": "<nombre>", "veces_por_semana": <número entero>, "dias": "<ej: lunes, miércoles, viernes>"}
   ]
 }
 `.trim();
 
-  const text = await askClaude({ system: SYSTEM, prompt, maxTokens: 700 });
+  const text = await askClaude({ system: SYSTEM, prompt, maxTokens: 1000 });
   return extractJson(text);
 }
 
@@ -104,15 +106,16 @@ pilar TIENE QUE ser uno de los que ya están definidos en el perfil de producto 
 "CTAS YA DEFINIDOS Y APROBADOS") — no inventes CTAs nuevos. Si un pilar es de tipo
 pregunta/reflexión sin llamado a la acción duro, escribí "sin CTA duro" en vez de forzar uno.
 
-Respondé con este JSON exacto, sin nada más alrededor:
+Respondé con este JSON exacto, sin nada más alrededor. Sé breve en "descripcion" (1 a 2
+oraciones cortas, no más) para que la respuesta no se corte, y no agregues campos extra:
 {
   "pilares": [
-    {"pilar": "<nombre corto>", "descripcion": "<1 a 3 oraciones>", "cta": "<CTA elegido o 'sin CTA duro'>"}
+    {"pilar": "<nombre corto>", "descripcion": "<1 a 2 oraciones breves>", "cta": "<CTA elegido o 'sin CTA duro'>"}
   ]
 }
 `.trim();
 
-  const text = await askClaude({ system: SYSTEM, prompt, maxTokens: 900 });
+  const text = await askClaude({ system: SYSTEM, prompt, maxTokens: 1300 });
   return extractJson(text);
 }
 
