@@ -103,9 +103,13 @@ CREATE TABLE IF NOT EXISTS identidad_visual_intentos (
 -- contenido_generado: Pantalla 3, generacion de copys + imagenes por pieza. Se genera por
 -- tramo (semana) segun pide la spec, no el plan completo de una — "semana" identifica el
 -- tramo (1, 2, 3...) dentro de la duracion del plan. El pilar de cada semana rota sobre
--- calendario del plan (calendario[(semana-1) % calendario.length]). La imagen NO se genera
--- con IA (ver decision en identidad_visual) — se sube a mano por pieza, igual patron que
--- el resto de las imagenes de la app (data URI base64).
+-- calendario del plan (calendario[(semana-1) % calendario.length]).
+--
+-- La imagen se COMPONE con codigo (fondo de identidad_visual + texto_imagen superpuesto +
+-- logo), no se le pide a un modelo de IA de imagen que la dibuje entera — el texto sobre
+-- imagen generado por IA suele salir mal escrito. texto_imagen es el titular corto que se
+-- superpone (distinto de copy, que es el texto completo del posteo). Tambien se puede
+-- subir una imagen propia a mano, que reemplaza a la compuesta.
 CREATE TABLE IF NOT EXISTS contenido_generado (
   id SERIAL PRIMARY KEY,
   plan_marketing_id INTEGER NOT NULL REFERENCES planes_marketing(id),
@@ -115,6 +119,7 @@ CREATE TABLE IF NOT EXISTS contenido_generado (
   fecha_programada DATE,
   pilar TEXT,
   copy TEXT,
+  texto_imagen TEXT DEFAULT '',
   imagen_ref TEXT,
   estado TEXT NOT NULL DEFAULT 'borrador', -- borrador | a_revisar | aprobado | rechazado | programado | publicado
   feedback TEXT,
@@ -123,8 +128,9 @@ CREATE TABLE IF NOT EXISTS contenido_generado (
   actualizado_en TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- Por si la tabla ya existia de un deploy anterior a que se agregara semana.
+-- Por si la tabla ya existia de un deploy anterior a que se agregaran estas columnas.
 ALTER TABLE contenido_generado ADD COLUMN IF NOT EXISTS semana INTEGER;
+ALTER TABLE contenido_generado ADD COLUMN IF NOT EXISTS texto_imagen TEXT DEFAULT '';
 
 -- Productos iniciales (no pisa nada si ya existen).
 INSERT INTO productos (slug, nombre) VALUES ('talent', 'In Move Talent') ON CONFLICT (slug) DO NOTHING;

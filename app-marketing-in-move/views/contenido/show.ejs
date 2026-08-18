@@ -25,11 +25,17 @@
   <p class="field-help">
     Se genera de a una semana por vez, no el plan completo. Cada semana usa un pilar de
     contenido distinto (rotan sobre los del plan) y genera una pieza por cada vez/semana
-    de cada canal. El copy lo escribe la IA; la imagen no — cada pieza nueva arranca con
-    una referencia de identidad visual puesta por defecto, y la podés reemplazar en las
-    piezas donde quieras algo distinto. Todo queda en borrador — todavía no hay cola de
-    aprobación.
+    de cada canal. El copy lo escribe la IA. La imagen de cada pieza se compone aparte,
+    con el botón "Crear imagen": fondo de identidad visual + un titular corto + tu logo —
+    el texto se dibuja con código, no lo escribe la IA de imagen, para que salga siempre
+    bien. Todo queda en borrador — todavía no hay cola de aprobación.
   </p>
+  <% if (!hayFondos) { %>
+    <p class="callout">
+      Para crear imágenes hace falta al menos una referencia aprobada en
+      <a href="/productos/<%= producto.slug %>/identidad-visual">Identidad visual</a>.
+    </p>
+  <% } %>
 
   <% semanas.forEach(function (s) { %>
     <section class="plan-section">
@@ -61,15 +67,21 @@
               <% if (p.imagen_ref) { %>
                 <img class="identidad-thumb" src="<%= p.imagen_ref %>" alt="Imagen de la pieza">
               <% } %>
-              <% if (!p.imagen_ref && hayImagenPorDefecto) { %>
-                <form method="POST" action="/productos/<%= producto.slug %>/contenido/pieza/<%= p.id %>/imagen-defecto">
-                  <button type="submit">Usar imagen de identidad visual</button>
+
+              <% if (hayFondos) { %>
+                <form method="POST" action="/productos/<%= producto.slug %>/contenido/pieza/<%= p.id %>/imagen-ia">
+                  <label class="muted small">Titular de la imagen (vacío = lo escribe la IA)</label>
+                  <textarea name="texto_imagen" rows="2"><%= p.texto_imagen || '' %></textarea>
+                  <div class="form-actions">
+                    <button type="submit"><%= p.imagen_ref ? 'Regenerar imagen' : 'Crear imagen' %></button>
+                  </div>
                 </form>
               <% } %>
+
               <form method="POST" action="/productos/<%= producto.slug %>/contenido/pieza/<%= p.id %>/imagen" enctype="multipart/form-data">
                 <input type="file" name="imagen" accept="image/*">
                 <div class="form-actions">
-                  <button type="submit"><%= p.imagen_ref ? 'Reemplazar imagen' : 'Subir otra imagen' %></button>
+                  <button type="submit">O subir la mía</button>
                 </div>
               </form>
             </div>

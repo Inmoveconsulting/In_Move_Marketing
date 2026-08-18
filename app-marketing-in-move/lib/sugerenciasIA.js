@@ -161,9 +161,42 @@ Devolvé solo el texto final del copy, listo para publicar.
   return text.trim();
 }
 
+// Texto corto para superponer en la imagen de una pieza (distinto del copy completo —
+// el copy es el texto del posteo, esto es el titular breve que va escrito sobre la foto,
+// tipo tarjeta/carrusel). Se compone con código (ver lib/imagenPieza.js), no lo dibuja la
+// IA de imagen, así que acá solo hace falta el texto en sí.
+async function sugerirTextoImagen({ perfil, pilar, copy }) {
+  const system =
+    'Sos un copywriter B2B experto en piezas visuales para redes. Escribís en español. Respondés ÚNICAMENTE con el texto final — sin comillas, sin explicaciones, sin punto final, sin markdown.';
+
+  const prompt = `
+TONO DE VOZ DE LA MARCA:
+${perfil.tono_voz}
+
+FRASES Y CONCEPTOS GUÍA (usalos si calzan naturalmente):
+${perfil.frases_guia}
+
+PILAR DE CONTENIDO: ${pilar.pilar}
+${pilar.descripcion}
+
+COPY COMPLETO DE ESTA PIEZA (para que el titular esté alineado, no lo repitas literal):
+${copy}
+
+Tarea: escribí un titular breve y directo para superponer sobre una imagen — como el título
+de una tarjeta o un carrusel, no el copy completo. Máximo 12 palabras, idealmente menos.
+Tiene que poder leerse de un vistazo. Sin punto final.
+
+Devolvé solo el titular.
+`.trim();
+
+  const { text } = await askClaude({ system, prompt, maxTokens: 120 });
+  return text.trim().replace(/^["']|["']$/g, '');
+}
+
 module.exports = {
   sugerirDuracion,
   sugerirCanales,
   sugerirCalendario,
   sugerirCopy,
+  sugerirTextoImagen,
 };

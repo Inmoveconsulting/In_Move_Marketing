@@ -9,14 +9,18 @@ const {
   getPerfilPorId,
   getIdentidadVisualAprobadaActual,
 } = require('../lib/queries');
-const { sugerirCopy } = require('../lib/sugerenciasIA');
+const { sugerirCopy, sugerirTextoImagen } = require('../lib/sugerenciasIA');
+const { crearImagenPieza } = require('../lib/imagenPieza');
 
 // Pantalla 3 — Generación de contenido. Se genera por tramo (semana), no el plan completo
 // de una (regla de la spec). El pilar de cada semana rota sobre el calendario del plan.
-// La imagen de cada pieza NO se genera con IA (decisión ya tomada en identidad_visual) —
-// se sube a mano, mismo patrón que el resto de las imágenes de la app. Cada pieza entra
-// en estado "borrador" — la cola de aprobación (Pantalla 4) todavía no está construida,
-// así que por ahora se puede editar/regenerar acá directo.
+//
+// La imagen de cada pieza se COMPONE con código: un fondo de identidad visual + el titular
+// de esa pieza superpuesto + el logo — no se le pide a un modelo de IA de imagen que la
+// dibuje entera (el texto sobre imagen generado por IA suele salir mal escrito). Se puede
+// crear/regenerar cuantas veces haga falta, o reemplazar por una imagen subida a mano.
+// Cada pieza entra en estado "borrador" — la cola de aprobación (Pantalla 4) todavía no
+// está construida, así que por ahora se puede editar/regenerar acá directo.
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -55,6 +59,13 @@ function totalPiezasEsperadasPorSemana(canales) {
   return (canales || []).reduce((sum, c) => sum + (c.veces_por_semana || 0), 0);
 }
 
+// Los fondos candidatos para componer imágenes son las referencias de identidad visual
+// (no el logo — el logo se usa aparte, como sello en la esquina, no como fondo).
+function fondosDeIdentidad(identidad) {
+  if (!identidad) return [];
+  return [identidad.referencia_1, identidad.referencia_2].filter(Boolean);
+}
+
 router.use(async (req, res, next) => {
   try {
     const producto = await getProducto(req.params.slug);
@@ -74,7 +85,7 @@ router.get('/', async (req, res, next) => {
         producto: req.producto,
         plan: null,
         semanas: [],
-        hayImagenPorDefecto: false,
+        hayFondos: false,
         error: req.query.error || null,
       });
     }
@@ -86,7 +97,7 @@ router.get('/', async (req, res, next) => {
       [plan.id]
     );
     const identidad = await getIdentidadVisualAprobadaActual(req.producto.id);
-    const hayImagenPorDefecto = !!(identidad && (identidad.referencia_1 || identidad.logo));
+    const hayFondos = fondosDeIdentidad(identidad).length > 0;
 
     const semanas = [];
     for (let n = 1; n <= totalSemanas; n += 1) {
@@ -104,7 +115,7 @@ router.get('/', async (req, res, next) => {
       producto: req.producto,
       plan,
       semanas,
-      hayImagenPorDefecto,
+      hayFondos,
       error: req.query.error || null,
     });
   } catch (err) {
@@ -115,7 +126,8 @@ router.get('/', async (req, res, next) => {
 // Generar (o completar) las piezas de una semana: un disparo de IA por pieza, con el
 // perfil + la fila del calendario correspondiente + el canal como contexto (regla de la
 // spec). Si ya hay piezas de esa semana, solo genera las que falten por canal — así una
-// falla parcial se puede resolver tocando el mismo botón de nuevo.
+// falla parcial se puede resolver tocando el mismo botón de nuevo. La imagen de cada
+// pieza se crea aparte, con el botón "Crear imagen" de cada tarjeta.
 router.post('/generar-semana', async (req, res, next) => {
   try {
     const plan = await getPlanAprobadoActual(req.producto.id);
@@ -160,12 +172,6 @@ router.post('/generar-semana', async (req, res, next) => {
     }
 
     const perfil = await getPerfilPorId(plan.perfil_producto_id);
-    // Imagen por defecto para piezas nuevas: la primera referencia de identidad visual
-    // aprobada (o el logo si no hay referencia), para que ninguna pieza arranque en
-    // blanco — se puede reemplazar por pieza igual.
-    const identidad = await getIdentidadVisualAprobadaActual(req.producto.id);
-    const imagenPorDefecto = identidad ? identidad.referencia_1 || identidad.logo || null : null;
-
     const resultados = await Promise.allSettled(
       tareas.map((canal) => sugerirCopy({ perfil, objetivoPlan: plan.objetivo, pilar, canal }))
     );
@@ -176,9 +182,9 @@ router.post('/generar-semana', async (req, res, next) => {
       if (r.status === 'fulfilled') {
         await pool.query(
           `INSERT INTO contenido_generado
-            (plan_marketing_id, perfil_producto_id, semana, canal, pilar, copy, imagen_ref, estado)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, 'borrador')`,
-          [plan.id, plan.perfil_producto_id, numero, tareas[i], pilar.pilar, r.value, imagenPorDefecto]
+            (plan_marketing_id, perfil_producto_id, semana, canal, pilar, copy, estado)
+           VALUES ($1, $2, $3, $4, $5, $6, 'borrador')`,
+          [plan.id, plan.perfil_producto_id, numero, tareas[i], pilar.pilar, r.value]
         );
       } else {
         fallos += 1;
@@ -249,7 +255,59 @@ router.post('/pieza/:id/regenerar', async (req, res, next) => {
   }
 });
 
-// Subir/reemplazar la imagen de una pieza (manual, sin IA — ver nota arriba).
+// Crear (o regenerar) la imagen de una pieza: fondo de identidad visual + titular +
+// logo, compuestos con código. Si el formulario trae un texto ya escrito, se usa tal
+// cual (no llama a la IA); si viene vacío, la IA escribe un titular breve a partir del
+// copy de la pieza. El fondo se elige al azar entre las referencias disponibles, así que
+// tocar el botón de nuevo es la forma de "no me gusta, probá otra".
+router.post('/pieza/:id/imagen-ia', async (req, res, next) => {
+  try {
+    const { rows } = await pool.query('SELECT * FROM contenido_generado WHERE id = $1', [req.params.id]);
+    const pieza = rows[0];
+    if (!pieza) return res.redirect(`/productos/${req.producto.slug}/contenido`);
+
+    const identidad = await getIdentidadVisualAprobadaActual(req.producto.id);
+    const fondos = fondosDeIdentidad(identidad);
+    if (fondos.length === 0) {
+      return res.redirect(
+        `/productos/${req.producto.slug}/contenido?error=${encodeURIComponent('Subí al menos una imagen de referencia en Identidad visual antes de crear imágenes.')}`
+      );
+    }
+
+    let texto = (req.body.texto_imagen || '').trim();
+    if (!texto) {
+      const { rows: planRows } = await pool.query('SELECT * FROM planes_marketing WHERE id = $1', [
+        pieza.plan_marketing_id,
+      ]);
+      const plan = planRows[0];
+      const perfil = await getPerfilPorId(pieza.perfil_producto_id);
+      const pilarObj = (plan.calendario || []).find((p) => p.pilar === pieza.pilar) || {
+        pilar: pieza.pilar,
+        descripcion: '',
+      };
+      texto = await sugerirTextoImagen({ perfil, pilar: pilarObj, copy: pieza.copy });
+    }
+
+    const fondoElegido = fondos[Math.floor(Math.random() * fondos.length)];
+    const imagen = await crearImagenPieza({
+      fondoDataUri: fondoElegido,
+      texto,
+      logoDataUri: identidad.logo,
+    });
+
+    await pool.query(
+      'UPDATE contenido_generado SET imagen_ref = $1, texto_imagen = $2, actualizado_en = now() WHERE id = $3',
+      [imagen, texto, pieza.id]
+    );
+    res.redirect(`/productos/${req.producto.slug}/contenido`);
+  } catch (err) {
+    res.redirect(
+      `/productos/${req.producto.slug}/contenido?error=${encodeURIComponent('No se pudo crear la imagen: ' + err.message)}`
+    );
+  }
+});
+
+// Subir/reemplazar la imagen de una pieza a mano (alternativa a la compuesta con IA).
 router.post('/pieza/:id/imagen', upload.single('imagen'), async (req, res, next) => {
   try {
     const dataUri = await archivoADataUri(req.file);
@@ -264,24 +322,6 @@ router.post('/pieza/:id/imagen', upload.single('imagen'), async (req, res, next)
     res.redirect(
       `/productos/${req.producto.slug}/contenido?error=${encodeURIComponent(err.message)}`
     );
-  }
-});
-
-// Aplica la imagen por defecto de identidad visual a una pieza que quedó sin imagen (por
-// ejemplo, piezas generadas antes de que este atajo existiera). Sin subir archivo.
-router.post('/pieza/:id/imagen-defecto', async (req, res, next) => {
-  try {
-    const identidad = await getIdentidadVisualAprobadaActual(req.producto.id);
-    const imagen = identidad ? identidad.referencia_1 || identidad.logo || null : null;
-    if (imagen) {
-      await pool.query(
-        'UPDATE contenido_generado SET imagen_ref = $1, actualizado_en = now() WHERE id = $2',
-        [imagen, req.params.id]
-      );
-    }
-    res.redirect(`/productos/${req.producto.slug}/contenido`);
-  } catch (err) {
-    next(err);
   }
 });
 

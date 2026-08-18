@@ -33,8 +33,9 @@ y la **Pantalla 3 — Generación de contenido** (identidad visual + generación
 **Contenido** (requiere un plan aprobado — si no hay ninguno, te manda de vuelta a la Pantalla 2):
 1. Se genera **por semana, no el plan completo de una** (regla de la spec). Cada semana usa un pilar de contenido distinto — rotan sobre los pilares del calendario del plan (semana 1 usa el primero, semana 2 el segundo, y si hay más semanas que pilares vuelve a empezar).
 2. Botón **"Generar semana N"** — un disparo de IA por pieza (una por cada vez/semana de cada canal del plan), con el perfil + la fila del calendario correspondiente como contexto, como pide la spec. Si algo falla a mitad de camino, tocar el botón de nuevo solo completa lo que falta, no duplica lo ya generado.
-3. Cada pieza tiene su **copy editable** (o "Regenerar copy" para pedirle a la IA que lo reescriba) y un espacio para **subir la imagen a mano** (sin IA — misma decisión que en identidad visual).
-4. Todo queda en estado **"borrador"** — la cola de aprobación (Pantalla 4) todavía no existe, así que por ahora se edita directo acá.
+3. Cada pieza tiene su **copy editable** (o "Regenerar copy" para pedirle a la IA que lo reescriba).
+4. **Imagen por pieza — botón "Crear imagen":** compone la imagen con código, no con un modelo de IA de imagen — fondo (una referencia de identidad visual) + un titular corto superpuesto + el logo. El titular lo escribe la IA a partir del copy (o lo escribís vos en el campo, y lo usa tal cual). "Regenerar imagen" prueba otro fondo y otro titular; "O subir la mía" reemplaza todo por un archivo propio. El texto se dibuja con `@resvg/resvg-js` cargando la tipografía Inter directo del archivo (`assets/fonts/`) — así sale siempre nítido y bien escrito, a diferencia de pedirle texto a un modelo de imagen.
+5. Todo queda en estado **"borrador"** — la cola de aprobación (Pantalla 4) todavía no existe, así que por ahora se edita directo acá.
 
 Las sugerencias de IA son eso — sugerencias. Todo queda como borrador editable y nada se aprueba solo; vos revisás y aprobás cada paso, como pide la spec.
 
@@ -64,8 +65,10 @@ app-marketing-in-move/
   lib/seedTalent.js        datos reales de In Move Talent v1.1, para el botón "cargar ejemplo"
   lib/queries.js           consultas SQL compartidas entre pantallas
   lib/claude.js            cliente minimo de la API de Claude (sin SDK, un fetch)
-  lib/sugerenciasIA.js     prompts de IA: duración/canales/calendario (pantalla 2) y copy (pantalla 3)
+  lib/sugerenciasIA.js     prompts de IA: duración/canales/calendario (pantalla 2), copy y titular de imagen (pantalla 3)
+  lib/imagenPieza.js       compone la imagen de cada pieza: fondo + titular + logo, con código (sin IA de imagen)
   lib/openaiImagenes.js    cliente de imágenes de OpenAI — sin uso activo (ver Identidad visual)
+  assets/fonts/            tipografía (Inter, licencia OFL) para dibujar texto sobre las imágenes
   views/                   plantillas EJS
   public/style.css         estilos
   render.yaml              config para que Render cree el servicio + la base con un click
@@ -255,8 +258,11 @@ Cuando te dé archivos nuevos o modificados:
    contra el pilar y el tono del perfil.
 4. Si alguna no te convence, **"Regenerar copy"** esa sola, o editala directo en el
    textarea y **"Guardar copy"**.
-5. Subí una imagen a alguna pieza para probar ese flujo (podés reusar el logo o una
-   referencia que ya subiste en Identidad visual).
+5. Con la identidad visual de In Move Talent aprobada (con al menos una referencia
+   subida), tocá **"Crear imagen"** en alguna pieza — deberías ver el fondo con un
+   titular corto superpuesto y el logo en la esquina. Probá **"Regenerar imagen"** para
+   ver otra combinación, y escribir tu propio titular en el campo antes de generar para
+   confirmar que lo respeta en vez de inventar uno.
 6. Repetí con la semana 2 para confirmar que rota al segundo pilar del calendario.
 
 ## Qué sigue (no construido todavía)
