@@ -50,13 +50,16 @@ function envolverTexto(texto, maxCaracteresPorLinea, maxLineas) {
   return lineas;
 }
 
-// SVG del overlay: banda oscura + texto + (opcional) placa blanca donde va el logo.
-// Transparente en todo lo demás, para que al componer se vea la foto de fondo debajo.
+// SVG del overlay: logo arriba (placa blanca chica) + banda oscura con el titular abajo.
+// Va así, y no al revés, porque la banda arriba terminaba cortando justo la cara de las
+// personas en la foto — abajo suele haber mesa/laptop, corta mucho menos. Transparente en
+// todo lo demás, para que al componer se vea la foto de fondo debajo.
 function construirSvgOverlay({ texto, conLogo }) {
   const tamañoFuente = 62;
   const interlineado = 74;
   const lineas = envolverTexto(texto, 24, 4);
   const altoBanda = 60 + lineas.length * interlineado + 40;
+  const yBanda = LADO - altoBanda;
 
   const textoSvg = lineas
     .map((linea, i) => `<tspan x="60" dy="${i === 0 ? 0 : interlineado}">${escaparXml(linea)}</tspan>`)
@@ -66,15 +69,15 @@ function construirSvgOverlay({ texto, conLogo }) {
 <svg width="${LADO}" height="${LADO}" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <linearGradient id="banda" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#0b1b2b" stop-opacity="0.92" />
-      <stop offset="100%" stop-color="#0b1b2b" stop-opacity="0.55" />
+      <stop offset="0%" stop-color="#0b1b2b" stop-opacity="0.55" />
+      <stop offset="100%" stop-color="#0b1b2b" stop-opacity="0.92" />
     </linearGradient>
   </defs>
-  <rect x="0" y="0" width="${LADO}" height="${altoBanda}" fill="url(#banda)" />
-  <text x="60" y="${60 + tamañoFuente * 0.8}" font-family="Inter" font-size="${tamañoFuente}" fill="#ffffff" font-weight="700">${textoSvg}</text>
+  <rect x="0" y="${yBanda}" width="${LADO}" height="${altoBanda}" fill="url(#banda)" />
+  <text x="60" y="${yBanda + 60 + tamañoFuente * 0.8}" font-family="Inter" font-size="${tamañoFuente}" fill="#ffffff" font-weight="700">${textoSvg}</text>
   ${
     conLogo
-      ? `<rect x="40" y="${LADO - 140}" width="200" height="100" rx="10" fill="#ffffff" fill-opacity="0.92" />`
+      ? `<rect x="40" y="40" width="200" height="100" rx="10" fill="#ffffff" fill-opacity="0.92" />`
       : ''
   }
 </svg>`.trim();
@@ -115,7 +118,7 @@ async function crearImagenPieza({ fondoDataUri, texto, logoDataUri }) {
       .toBuffer();
     const metaLogo = await sharp(logoRedimensionado).metadata();
     const left = 40 + Math.round((200 - (metaLogo.width || 160)) / 2);
-    const top = LADO - 140 + Math.round((100 - (metaLogo.height || 80)) / 2);
+    const top = 40 + Math.round((100 - (metaLogo.height || 80)) / 2);
     composicion.push({ input: logoRedimensionado, top, left });
   }
 
