@@ -16,13 +16,17 @@ const { crearImagenPieza } = require('../lib/imagenPieza');
 // Pantalla 3 — Generación de contenido. Se genera por tramo (semana), no el plan completo
 // de una (regla de la spec). El pilar de cada semana rota sobre el calendario del plan.
 //
-// Proceso de imagen por pieza: la IA de OpenAI genera el FONDO (foto), usando el prompt +
-// las referencias de estilo definidas en Identidad visual — así no hay que salir a buscar
-// fotos a mano. El titular y el logo se agregan aparte, compuestos con código (no se los
-// pedimos a la IA de imagen: el texto que dibuja un modelo de imagen suele salir mal
-// escrito). Las piezas de Email no llevan imagen. Cada pieza entra en estado "borrador" —
-// la cola de aprobación (Pantalla 4) todavía no está construida, así que por ahora se
-// puede editar/regenerar acá directo.
+// Proceso de imagen por pieza: la IA de OpenAI genera el FONDO (foto) a partir del prompt
+// de Identidad visual + el copy puntual de la pieza — texto solamente, sin adjuntar las
+// fotos de referencia como imagen de entrada. Se probó adjuntarlas (para guiar el estilo
+// más de cerca) pero el modo "editar a partir de una foto" de OpenAI termina copiando
+// literal a la persona de esa foto en todas las piezas, sin importar qué se le pida en el
+// texto — así que las referencias sirven para que vos definas el prompt con criterio, no
+// como input directo a la IA. El titular y el logo se agregan aparte, compuestos con
+// código (no se los pedimos a la IA de imagen: el texto que dibuja un modelo de imagen
+// suele salir mal escrito). Las piezas de Email no llevan imagen. Cada pieza entra en
+// estado "borrador" — la cola de aprobación (Pantalla 4) todavía no está construida, así
+// que por ahora se puede editar/regenerar acá directo.
 
 const CANALES_SIN_IMAGEN = ['Email'];
 
@@ -61,11 +65,6 @@ function pilarDeSemana(calendario, semana) {
 
 function totalPiezasEsperadasPorSemana(canales) {
   return (canales || []).reduce((sum, c) => sum + (c.veces_por_semana || 0), 0);
-}
-
-function referenciasDeIdentidad(identidad) {
-  if (!identidad) return [];
-  return [identidad.referencia_1, identidad.referencia_2].filter(Boolean);
 }
 
 // Sin esto, todas las piezas de una misma semana (mismo pilar, mismas referencias, prompt
@@ -110,14 +109,18 @@ ${pieza.copy}
 
 Encuadre sugerido, adaptalo a lo que pida el copy de arriba si hace falta: ${tomaAleatoria()}
 
-Importante: las imágenes de referencia son solo guía de tono, paleta y composición
-general — NO repliques a la misma persona/rostro de esas referencias en cada imagen.
-Cada pieza tiene que tener personas y escenas distintas entre sí.
+Usá personas y escenas distintas de las de otras piezas — no repitas siempre la misma
+cara ni la misma composición.
 
 No incluyas texto ni logos en la imagen — eso se agrega aparte. Formato cuadrado.
 `.trim();
 
-  const fondo = await generarFondoImagen({ prompt, referencias: referenciasDeIdentidad(identidad) });
+  // No le mandamos las fotos de referencia como imagen de entrada: el modo "editar a
+  // partir de una foto" de OpenAI copia literal a la persona de esa foto sin importar lo
+  // que se le pida en el texto — es como funciona ese modo, no algo instruible. Guiamos
+  // el estilo solo con palabras (el prompt de arriba), así cada pieza sale con personas
+  // y escenas distintas de verdad.
+  const fondo = await generarFondoImagen({ prompt, referencias: [] });
   const imagen = await crearImagenPieza({ fondoDataUri: fondo, texto, logoDataUri: identidad.logo });
 
   return { imagen, texto };
