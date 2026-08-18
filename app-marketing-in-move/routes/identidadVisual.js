@@ -1,5 +1,6 @@
 const express = require('express');
 const multer = require('multer');
+const sharp = require('sharp');
 const router = express.Router({ mergeParams: true });
 const pool = require('../db/pool');
 const {
@@ -54,9 +55,21 @@ const camposArchivos = upload.fields([
   { name: 'referencia_2', maxCount: 1 },
 ]);
 
-function archivoADataUri(file) {
+// La API de OpenAI solo acepta jpeg/png/webp — muchos logos son SVG (o cualquier otro
+// formato), así que normalizamos todo a PNG acá, sea lo que sea lo que se suba. Sharp
+// también sirve para poner un tamaño razonable a un SVG, que no trae resolución fija.
+async function archivoADataUri(file) {
   if (!file) return null;
-  return `data:${file.mimetype};base64,${file.buffer.toString('base64')}`;
+  try {
+    const buffer = await sharp(file.buffer, { density: 300 })
+      .resize({ width: 1600, height: 1600, fit: 'inside', withoutEnlargement: true })
+      .flatten({ background: '#ffffff' })
+      .png()
+      .toBuffer();
+    return `data:image/png;base64,${buffer.toString('base64')}`;
+  } catch (e) {
+    throw new Error(`No se pudo procesar el archivo "${file.originalname}": ${e.message}`);
+  }
 }
 
 function construirPrompt({ perfil, estiloValor, notas }) {
@@ -131,11 +144,16 @@ router.post('/', camposArchivos, async (req, res, next) => {
     }
 
     const archivos = req.files || {};
-    const logo = archivoADataUri(archivos.logo && archivos.logo[0]) || (actual && actual.logo) || null;
+    const logo =
+      (await archivoADataUri(archivos.logo && archivos.logo[0])) || (actual && actual.logo) || null;
     const referencia_1 =
-      archivoADataUri(archivos.referencia_1 && archivos.referencia_1[0]) || (actual && actual.referencia_1) || null;
+      (await archivoADataUri(archivos.referencia_1 && archivos.referencia_1[0])) ||
+      (actual && actual.referencia_1) ||
+      null;
     const referencia_2 =
-      archivoADataUri(archivos.referencia_2 && archivos.referencia_2[0]) || (actual && actual.referencia_2) || null;
+      (await archivoADataUri(archivos.referencia_2 && archivos.referencia_2[0])) ||
+      (actual && actual.referencia_2) ||
+      null;
     const estilo = (req.body.estilo || '').trim();
     const notas_estilo = (req.body.notas_estilo || '').trim();
 
@@ -158,7 +176,9 @@ router.post('/', camposArchivos, async (req, res, next) => {
 
     res.redirect(`/productos/${req.producto.slug}/identidad-visual`);
   } catch (err) {
-    next(err);
+    res.redirect(
+      `/productos/${req.producto.slug}/identidad-visual?error=${encodeURIComponent(err.message)}`
+    );
   }
 });
 
