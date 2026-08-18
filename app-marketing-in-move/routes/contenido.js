@@ -103,8 +103,16 @@ ${identidad.prompt_imagen}
 Contexto de esta pieza puntual: pilar de contenido "${pilarObj.pilar}" — ${pilarObj.descripcion}.
 Canal: ${pieza.canal}.
 
-Encuadre para ESTA imagen puntual (para que no se repita el mismo encuadre que otras
-piezas de la misma semana): ${tomaAleatoria()}
+Copy exacto de esta pieza (la imagen tiene que representar visualmente la idea concreta
+de este texto, no una escena genérica del pilar — esto es lo que hace que cada pieza sea
+distinta de las demás de la misma semana, aunque compartan pilar):
+${pieza.copy}
+
+Encuadre sugerido, adaptalo a lo que pida el copy de arriba si hace falta: ${tomaAleatoria()}
+
+Importante: las imágenes de referencia son solo guía de tono, paleta y composición
+general — NO repliques a la misma persona/rostro de esas referencias en cada imagen.
+Cada pieza tiene que tener personas y escenas distintas entre sí.
 
 No incluyas texto ni logos en la imagen — eso se agrega aparte. Formato cuadrado.
 `.trim();
