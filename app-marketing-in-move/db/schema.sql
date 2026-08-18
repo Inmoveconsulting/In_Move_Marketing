@@ -54,10 +54,16 @@ CREATE TABLE IF NOT EXISTS planes_marketing (
 ALTER TABLE planes_marketing ADD COLUMN IF NOT EXISTS canales_razon TEXT DEFAULT '';
 
 -- identidad_visual: paso previo de la Pantalla 3, antes de generar copys + imagenes.
--- Calibra una plantilla visual de marca (logo + hasta 2 referencias + estilo elegido)
--- generando imagenes de prueba con IA hasta aprobar una. Mismo patron de version/estado
--- que el resto. Las imagenes se guardan como data URI base64 en TEXT — a esta escala
--- (un puñado de imagenes por producto) no justifica sumar un storage externo (S3, etc.).
+-- Define la identidad visual de marca subiendo imagenes de referencia (logo + hasta 2
+-- referencias) que la usuaria ya sabe que funcionan. Mismo patron de version/estado que
+-- el resto. Las imagenes se guardan como data URI base64 en TEXT — a esta escala (un
+-- puñado de imagenes por producto) no justifica sumar un storage externo (S3, etc.).
+--
+-- Nota: se probo generar la imagen de prueba con IA (columnas estilo, prompt_imagen,
+-- imagen_generada, prompt_usado, intentos, y la tabla identidad_visual_intentos de abajo)
+-- pero el resultado no convencia y salia caro — se volvio al flujo simple de subir
+-- referencias directo. Las columnas quedan en la tabla sin uso activo por si se retoma
+-- mas adelante, no se borran para no arriesgar datos ya guardados.
 CREATE TABLE IF NOT EXISTS identidad_visual (
   id SERIAL PRIMARY KEY,
   producto_id INTEGER NOT NULL REFERENCES productos(id),
@@ -68,9 +74,9 @@ CREATE TABLE IF NOT EXISTS identidad_visual (
   referencia_2 TEXT,
   estilo TEXT DEFAULT '',
   notas_estilo TEXT DEFAULT '',
-  prompt_imagen TEXT DEFAULT '',  -- prompt editable, mostrado y ajustable en pantalla
+  prompt_imagen TEXT DEFAULT '',
   imagen_generada TEXT,
-  prompt_usado TEXT DEFAULT '',   -- copia congelada de lo que se mandó en la última generación
+  prompt_usado TEXT DEFAULT '',
   intentos INTEGER NOT NULL DEFAULT 0,
   version_origen_id INTEGER REFERENCES identidad_visual(id),
   creado_en TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -82,9 +88,8 @@ CREATE TABLE IF NOT EXISTS identidad_visual (
 -- Por si la tabla ya existia de un deploy anterior a que se agregara prompt_imagen.
 ALTER TABLE identidad_visual ADD COLUMN IF NOT EXISTS prompt_imagen TEXT DEFAULT '';
 
--- Historial de cada imagen de prueba generada dentro de un borrador de identidad_visual
--- (no solo la ultima) — para poder comparar y volver a una anterior antes de aprobar,
--- en vez de perderla al generar otra.
+-- Sin uso activo (ver nota arriba) — se deja creada por si ya tiene datos de un deploy
+-- anterior, no se borra.
 CREATE TABLE IF NOT EXISTS identidad_visual_intentos (
   id SERIAL PRIMARY KEY,
   identidad_visual_id INTEGER NOT NULL REFERENCES identidad_visual(id),

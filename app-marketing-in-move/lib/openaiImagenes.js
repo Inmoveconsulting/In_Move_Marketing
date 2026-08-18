@@ -1,6 +1,11 @@
 // Cliente minimo para la API de imagenes de OpenAI (gpt-image-1). Sin SDK, un solo fetch
 // con FormData nativo de Node — igual filosofia que lib/claude.js.
 //
+// SIN USO ACTIVO por ahora: se probo para generar la imagen de prueba de "Identidad
+// visual" pero el resultado no convencia y salia caro (ver nota en db/schema.sql). Se
+// volvio a un flujo de subir referencias directo. Se deja el archivo por si se retoma
+// mas adelante para la generacion real de piezas (Pantalla 3).
+//
 // Requiere la variable de entorno OPENAI_API_KEY (se configura en Render). Distinta de
 // ANTHROPIC_API_KEY: es otra cuenta, de platform.openai.com.
 //

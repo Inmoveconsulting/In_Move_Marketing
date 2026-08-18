@@ -22,7 +22,7 @@
 <% if (!perfilAprobado) { %>
   <p class="callout">
     Este producto todavía no tiene un perfil aprobado. Hace falta aprobar el perfil antes
-    de calibrar la identidad visual —
+    de definir la identidad visual —
     <a href="/productos/<%= producto.slug %>/perfil">ir al perfil de producto</a>.
   </p>
 <% } else { %>
@@ -31,20 +31,18 @@
     <p class="callout callout-error"><%= error %></p>
   <% } %>
 
-  <% if (!iaDisponible) { %>
-    <p class="muted small">
-      La generación de imágenes está desactivada: falta configurar <code>OPENAI_API_KEY</code>
-      en las variables de entorno del servicio. Mientras tanto podés subir los archivos y
-      elegir el estilo, pero no vas a poder generar la imagen de prueba.
-    </p>
-  <% } %>
-
   <p class="field-help">
-    Subí hasta 3 archivos que definan la identidad de marca (logo obligatorio; captura de la
-    landing y algo más, opcionales) y elegí un estilo. La IA va a generar una imagen de
-    prueba usando esos archivos como referencia — la podés regenerar las veces que haga
-    falta hasta aprobar una plantilla.
+    Subí imágenes de referencia que ya sabés que representan bien a la marca — fotos o
+    piezas que te gusten, no hace falta generar nada nuevo. Qué buscar en una buena
+    referencia:
   </p>
+  <ul class="field-help" style="margin-top:-8px">
+    <li>Que tenga una zona de fondo liso o de bajo contraste, para poder poner un título
+      encima más adelante sin que compita con la imagen.</li>
+    <li>Que el tono (colores, luz, energía) se sienta coherente con la marca — revisá el
+      tono de voz del perfil de producto si tenés dudas.</li>
+    <li>Formato cuadrado o parecido, para que sirva igual en LinkedIn e Instagram.</li>
+  </ul>
 
   <% if (readonly) { %>
     <div class="identidad-grid">
@@ -59,30 +57,7 @@
         <div><p class="muted small">Referencia 2</p><img class="identidad-thumb" src="<%= iv.referencia_2 %>" alt="Referencia 2"></div>
       <% } %>
     </div>
-    <p><strong>Estilo:</strong> <%= (estilos.find((e) => e.valor === iv.estilo) || {}).nombre || iv.estilo %></p>
     <% if (iv.notas_estilo) { %><div class="field-readonly"><%= iv.notas_estilo %></div><% } %>
-
-    <% if (iv.imagen_generada) { %>
-      <p class="muted small" style="margin-top:20px">Plantilla aprobada:</p>
-      <img class="identidad-preview" src="<%= iv.imagen_generada %>" alt="Plantilla visual aprobada">
-    <% } %>
-
-    <% if (iv.prompt_imagen) { %>
-      <p class="muted small" style="margin-top:16px">Prompt usado para generar esta plantilla:</p>
-      <div class="field-readonly small"><%= iv.prompt_imagen %></div>
-    <% } %>
-
-    <% if (intentos && intentos.length > 1) { %>
-      <p class="muted small" style="margin-top:16px">Otros intentos generados en esta versión (para referencia):</p>
-      <div class="intentos-grid">
-        <% intentos.forEach(function (it) { %>
-          <div class="intento-card">
-            <img class="identidad-thumb" src="<%= it.imagen %>" alt="Intento <%= it.numero %>">
-            <p class="muted small">Intento <%= it.numero %><%= it.imagen === iv.imagen_generada ? ' — aprobado' : '' %></p>
-          </div>
-        <% }); %>
-      </div>
-    <% } %>
   <% } else { %>
     <form method="POST" action="/productos/<%= producto.slug %>/identidad-visual" enctype="multipart/form-data">
       <div class="field">
@@ -91,7 +66,7 @@
         <input type="file" id="logo" name="logo" accept="image/*">
       </div>
       <div class="field">
-        <label for="referencia_1">Referencia 1 — ej: captura de la landing</label>
+        <label for="referencia_1">Referencia 1 — una foto/imagen que represente el estilo que buscás</label>
         <% if (iv && iv.referencia_1) { %><img class="identidad-thumb" src="<%= iv.referencia_1 %>" alt="Referencia 1 actual"><% } %>
         <input type="file" id="referencia_1" name="referencia_1" accept="image/*">
       </div>
@@ -102,94 +77,18 @@
       </div>
 
       <div class="field">
-        <label>Estilo</label>
-        <% estilos.forEach(function (e) { %>
-          <label class="estilo-opcion">
-            <input type="radio" name="estilo" value="<%= e.valor %>" <%= iv && iv.estilo === e.valor ? 'checked' : '' %>>
-            <strong><%= e.nombre %></strong> — <span class="muted small"><%= e.descripcion %></span>
-          </label>
-        <% }); %>
-      </div>
-
-      <div class="field">
-        <label for="notas_estilo">Dirección creativa adicional (opcional)</label>
-        <p class="field-help">
-          Mood que buscás (ej: alegría, frescura, dinamismo, moderno), qué evitar, colores
-          de marca en hex si los tenés — cualquier cosa que quieras que la IA tenga en
-          cuenta al escribir el prompt de la imagen.
-        </p>
+        <label for="notas_estilo">Notas (opcional)</label>
+        <p class="field-help">Cualquier contexto adicional sobre por qué elegiste estas referencias, para quien retome esto más adelante.</p>
         <textarea id="notas_estilo" name="notas_estilo" rows="3"><%= (iv && iv.notas_estilo) || '' %></textarea>
       </div>
 
-      <div class="form-actions"><button type="submit">Guardar identidad visual</button></div>
+      <div class="form-actions">
+        <button type="submit">Guardar borrador</button>
+        <% if (iv) { %>
+          <button type="submit" formaction="/productos/<%= producto.slug %>/identidad-visual/aprobar" class="btn-primary">Aprobar identidad visual</button>
+        <% } %>
+      </div>
     </form>
-
-    <% if (iv && iv.logo && iv.estilo) { %>
-      <section class="plan-section">
-        <h2>Prompt de la imagen</h2>
-        <p class="field-help">
-          Este es el texto exacto que se le manda a la IA para generar la imagen. Podés
-          editarlo directo acá abajo, o pedirle a Claude que lo mejore usando la dirección
-          creativa de arriba — sin salir de la app.
-        </p>
-        <form method="POST" action="/productos/<%= producto.slug %>/identidad-visual/prompt">
-          <textarea name="prompt_imagen" rows="10"><%= iv.prompt_imagen || '' %></textarea>
-          <div class="form-actions">
-            <button type="submit">Guardar prompt</button>
-          </div>
-        </form>
-        <% if (iaDisponible) { %>
-          <form method="POST" action="/productos/<%= producto.slug %>/identidad-visual/sugerir-prompt">
-            <div class="form-actions">
-              <button type="submit">Mejorar prompt con IA</button>
-            </div>
-          </form>
-        <% } %>
-
-        <h2 style="margin-top:32px">Imagen de prueba</h2>
-        <% if (iaDisponible) { %>
-          <form method="POST" action="/productos/<%= producto.slug %>/identidad-visual/generar">
-            <button type="submit">
-              <%= iv.imagen_generada ? 'Generar otra versión' : 'Generar imagen de prueba' %>
-            </button>
-          </form>
-        <% } %>
-        <% if (iv.intentos > 0) { %>
-          <p class="muted small">Intentos de generación: <%= iv.intentos %></p>
-        <% } %>
-
-        <% if (iv.imagen_generada) { %>
-          <p class="muted small">Actual (la que se aprobaría si tocás "Aprobar"):</p>
-          <img class="identidad-preview" src="<%= iv.imagen_generada %>" alt="Imagen de prueba generada">
-          <form method="POST" action="/productos/<%= producto.slug %>/identidad-visual/aprobar">
-            <div class="form-actions">
-              <button type="submit" class="btn-primary">Aprobar esta imagen como plantilla</button>
-            </div>
-          </form>
-
-          <% if (intentos && intentos.length > 1) { %>
-            <h3 style="margin-top:28px">Todos los intentos — volvé a cualquiera</h3>
-            <p class="field-help">La que está marcada "Actual" es la que se aprobaría. Elegí otra si te gustó más.</p>
-            <div class="intentos-grid">
-              <% intentos.forEach(function (it) { %>
-                <div class="intento-card">
-                  <img class="identidad-thumb" src="<%= it.imagen %>" alt="Intento <%= it.numero %>">
-                  <p class="muted small">Intento <%= it.numero %></p>
-                  <% if (it.imagen === iv.imagen_generada) { %>
-                    <span class="badge badge-aprobado">Actual</span>
-                  <% } else { %>
-                    <form method="POST" action="/productos/<%= producto.slug %>/identidad-visual/usar-intento">
-                      <input type="hidden" name="numero" value="<%= it.numero %>">
-                      <button type="submit">Usar esta versión</button>
-                    </form>
-                  <% } %>
-                </div>
-              <% }); %>
-            </div>
-          <% } %>
-        <% } %>
-      </section>
-    <% } %>
   <% } %>
 
   <% if (readonly && !esHistorico) { %>

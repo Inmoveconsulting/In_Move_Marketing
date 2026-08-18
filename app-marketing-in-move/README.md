@@ -7,8 +7,8 @@ No comparte código, base de datos ni configuración con esa app — no la toca.
 ## Estado actual
 
 Están construidas la **Pantalla 1 — Perfil de producto**, la **Pantalla 2 — Plan de Marketing**
-y el paso previo de la **Pantalla 3 — Identidad visual** (calibración de la plantilla visual,
-antes de generar copys + imágenes por pieza):
+y el paso previo de la **Pantalla 3 — Identidad visual** (definir imágenes de referencia de
+marca, antes de generar copys + imágenes por pieza):
 
 **Pantalla 1:**
 - Selector de producto (pantalla 0) con alta de productos nuevos.
@@ -24,13 +24,12 @@ antes de generar copys + imágenes por pieza):
 4. **Calendario (pilares de contenido)** — botón "Generar propuesta con IA" (usa los CTAs ya definidos en el perfil, no inventa nuevos) o carga manual de hasta 6 pilares.
 5. Mismo patrón de estado/versión que el perfil. Guarda `perfil_producto_id`: a qué versión exacta del perfil está atado.
 
-**Identidad visual** (requiere un perfil aprobado; la spec marcaba esta decisión como pendiente antes de programar la generación de imágenes):
-1. Subís hasta 3 archivos de referencia de marca: **logo** (obligatorio), y opcionalmente una captura de la landing y algo más. Cualquier formato (SVG incluido) se convierte solo a PNG.
-2. Elegís un **estilo** de una lista fija (fotografía realista, ilustración editorial, minimalista geométrico, collage moderno, moderno y dinámico) y podés agregar una **dirección creativa** en texto libre (mood, qué evitar, colores de marca en hex).
-3. La app arma un **prompt de imagen** editable en pantalla — con reglas fijas siempre activas para evitar el look de foto stock corporativa genérica (esto es lo que antes había que resolver a mano en otro chat). Botón **"Mejorar prompt con IA"** para que Claude lo reescriba mejor según tu dirección creativa, o lo editás vos directo en el textarea.
-4. Botón **"Generar imagen de prueba"** — llama a la API de imágenes de OpenAI (`gpt-image-1`) con ese prompt + tus archivos como referencia visual.
-5. **"Generar otra versión"** las veces que haga falta — podés ajustar el prompt entre una generación y otra. Cada intento queda guardado (no solo el último): aparecen en una galería y podés volver a cualquiera con **"Usar esta versión"** antes de aprobar, sin gastar otra llamada a la IA.
-6. **"Aprobar esta imagen como plantilla"** — congela esa versión como la plantilla de marca aprobada. Mismo patrón de estado/versión que el resto.
+**Identidad visual** (requiere un perfil aprobado):
+1. Subís hasta 3 archivos de referencia de marca: **logo** (obligatorio) y hasta 2 imágenes que representen el estilo que buscás — fotos o piezas que ya te gusten, no algo generado. Cualquier formato (SVG incluido) se convierte solo a PNG.
+2. La pantalla indica qué buscar en una buena referencia: zona de fondo liso para poner texto encima, tono coherente con la marca, formato cuadrado.
+3. **"Aprobar identidad visual"** — congela esa versión como la referencia de marca aprobada. Mismo patrón de estado/versión que el resto.
+
+*(Se probó primero generar la imagen con IA — OpenAI `gpt-image-1`, con estilos, prompt editable y regeneración — pero el resultado no convencía y salía caro por intento. Se volvió a este flujo más simple y sin costo. El código de esa prueba queda en `lib/openaiImagenes.js`, sin uso activo, por si se retoma más adelante para la generación real de piezas.)*
 
 Las sugerencias de IA son eso — sugerencias. Todo queda como borrador editable y nada se aprueba solo; vos revisás y aprobás cada paso, como pide la spec.
 
@@ -172,21 +171,12 @@ volumen de esta app — cada sugerencia es una sola llamada corta).
 Variable opcional: `CLAUDE_MODEL` (por defecto usa `claude-sonnet-5`) si en algún momento
 querés apuntar a otro modelo.
 
-### API key de OpenAI (necesaria para generar imágenes en Identidad visual)
+### API key de OpenAI (no necesaria por ahora)
 
-Ni Claude ni la API de Anthropic generan imágenes — para eso la app usa la API de imágenes
-de OpenAI (`gpt-image-1`), que es una cuenta y una key totalmente aparte.
-
-Sin esto, la pantalla de Identidad visual funciona igual para subir archivos y elegir
-estilo, pero no vas a poder generar la imagen de prueba.
-
-1. Andá a [platform.openai.com](https://platform.openai.com), entrá con tu cuenta (o creá
-   una) y generá una API key nueva (sección "API keys").
-2. Puede que te pida cargar un medio de pago antes de dejarte usar la API de imágenes —
-   es una cuenta de pago por uso, separada de todo lo demás.
-3. En Render, entrá al servicio `in-move-marketing` → pestaña **Environment**.
-4. Agregá la variable `OPENAI_API_KEY` con el valor que copiaste.
-5. Guardá — redespliega solo.
+La Pantalla de Identidad visual no usa IA de imágenes — se suben referencias directo (ver
+más arriba por qué). `OPENAI_API_KEY` no hace falta hoy; queda documentada acá por si en
+el futuro se retoma la generación de imágenes para piezas reales (`lib/openaiImagenes.js`).
+Si ya la cargaste en Render, no molesta dejarla — simplemente no se usa todavía.
 
 ## Cómo actualizar la app en el futuro (mismo mecanismo que ya usás)
 
@@ -241,15 +231,11 @@ Cuando te dé archivos nuevos o modificados:
 
 1. Con el perfil de In Move Talent aprobado, entrá a "In Move Talent" y tocá **"Ir a
    identidad visual →"** (junto a "Ver historial" en la Pantalla 1).
-2. Subí el logo de In Move (obligatorio), y si tenés a mano una captura de la landing o de
-   la demo, subila como referencia 1.
-3. Elegí un estilo de la lista (para un producto B2B serio, "Fotografía realista
-   corporativa" o "Minimalista geométrico" son buenos puntos de partida) y guardá.
-4. Tocá **"Generar imagen de prueba"** (necesita `OPENAI_API_KEY` configurada — ver más
-   arriba). Tarda unos segundos.
-5. Si no te convence, tocá **"Generar otra versión"** las veces que haga falta — podés
-   cambiar el estilo o las instrucciones adicionales antes de volver a generar.
-6. Cuando una te convenza, **"Aprobar esta imagen como plantilla"**.
+2. Subí el logo de In Move (obligatorio).
+3. Subí 1 o 2 imágenes que ya te gusten como referencia de estilo — de la landing, de la
+   demo, o de cualquier lado — siguiendo la guía que aparece en pantalla (fondo liso para
+   texto, tono coherente, formato cuadrado).
+4. Guardá borrador, revisalo, y **"Aprobar identidad visual"**.
 
 ## Qué sigue (no construido todavía)
 

@@ -8,8 +8,6 @@
     <tr>
       <th>Versión</th>
       <th>Estado</th>
-      <th>Estilo</th>
-      <th>Intentos</th>
       <th>Creado</th>
       <th>Aprobado</th>
       <th></th>
@@ -20,15 +18,13 @@
       <tr>
         <td>v<%= v.version %></td>
         <td><span class="badge badge-<%= v.estado %>"><%= v.estado === 'aprobado' ? 'Aprobado' : 'Borrador' %></span></td>
-        <td><%= v.estilo || '—' %></td>
-        <td><%= v.intentos %></td>
         <td><%= new Date(v.creado_en).toLocaleDateString('es-AR') %></td>
         <td><%= v.aprobado_en ? new Date(v.aprobado_en).toLocaleDateString('es-AR') : '—' %></td>
         <td><a href="/productos/<%= producto.slug %>/identidad-visual/version/<%= v.version %>">Ver</a></td>
       </tr>
     <% }); %>
     <% if (!versiones.length) { %>
-      <tr><td colspan="7" class="muted">Todavía no hay versiones.</td></tr>
+      <tr><td colspan="5" class="muted">Todavía no hay versiones.</td></tr>
     <% } %>
   </tbody>
 </table>
