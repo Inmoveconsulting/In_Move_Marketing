@@ -161,13 +161,14 @@ Devolvé solo el texto final del copy, listo para publicar.
   return text.trim();
 }
 
-// Texto corto para superponer en la imagen de una pieza (distinto del copy completo —
-// el copy es el texto del posteo, esto es el titular breve que va escrito sobre la foto,
-// tipo tarjeta/carrusel). Se compone con código (ver lib/imagenPieza.js), no lo dibuja la
-// IA de imagen, así que acá solo hace falta el texto en sí.
-async function sugerirTextoImagen({ perfil, pilar, copy }) {
+// Titular + bajada para superponer en la imagen de una pieza (distinto del copy completo
+// — el copy es el texto del posteo, esto es lo que va escrito sobre la foto, tipo tarjeta
+// de LinkedIn/Instagram: un titular corto y contundente + una línea de apoyo debajo que
+// lo aterriza). Se compone con código (ver lib/imagenPieza.js), no lo dibuja la IA de
+// imagen.
+async function sugerirTitularYBajada({ perfil, pilar, copy }) {
   const system =
-    'Sos un copywriter B2B experto en piezas visuales para redes. Escribís en español. Respondés ÚNICAMENTE con el texto final — sin comillas, sin explicaciones, sin punto final, sin markdown.';
+    'Sos un copywriter B2B experto en piezas visuales para redes (tipo tarjetas de LinkedIn/Instagram). Escribís en español. Respondés ÚNICAMENTE con JSON válido, sin texto extra antes o después, sin bloques de código.';
 
   const prompt = `
 TONO DE VOZ DE LA MARCA:
@@ -179,18 +180,29 @@ ${perfil.frases_guia}
 PILAR DE CONTENIDO: ${pilar.pilar}
 ${pilar.descripcion}
 
-COPY COMPLETO DE ESTA PIEZA (para que el titular esté alineado, no lo repitas literal):
+COPY COMPLETO DE ESTA PIEZA (para que el titular y la bajada estén alineados con esto, no
+lo repitan literal):
 ${copy}
 
-Tarea: escribí un titular breve y directo para superponer sobre una imagen — como el título
-de una tarjeta o un carrusel, no el copy completo. Máximo 12 palabras, idealmente menos.
-Tiene que poder leerse de un vistazo. Sin punto final.
+Tarea: escribí el titular y la bajada para superponer sobre la imagen de esta pieza —
+como una tarjeta de LinkedIn/Instagram, no el copy completo:
+- "titular": el gancho, corto y contundente. Máximo 8 palabras. Sin punto final.
+- "bajada": una sola oración que aterriza el titular con el beneficio o la evidencia
+  concreta. Máximo 14 palabras.
 
-Devolvé solo el titular.
+Evidencia sobre promesa, directo, sin relleno — como pide el tono de marca de arriba. No
+uses siempre la misma estructura de titular entre piezas distintas.
+
+Respondé con este JSON exacto, sin nada más alrededor:
+{"titular": "<máximo 8 palabras>", "bajada": "<máximo 14 palabras, una sola oración>"}
 `.trim();
 
-  const { text } = await askClaude({ system, prompt, maxTokens: 120 });
-  return text.trim().replace(/^["']|["']$/g, '');
+  const { text, stopReason } = await askClaude({ system, prompt, maxTokens: 250 });
+  const resultado = extractJson(text, { stopReason });
+  return {
+    titular: (resultado.titular || '').trim().replace(/^["']|["']$/g, ''),
+    bajada: (resultado.bajada || '').trim().replace(/^["']|["']$/g, ''),
+  };
 }
 
 module.exports = {
@@ -198,5 +210,5 @@ module.exports = {
   sugerirCanales,
   sugerirCalendario,
   sugerirCopy,
-  sugerirTextoImagen,
+  sugerirTitularYBajada,
 };

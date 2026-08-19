@@ -25,9 +25,9 @@
   <p class="field-help">
     Se genera de a una semana por vez, no el plan completo. Primero los copys (un pilar
     distinto por semana, rotan sobre los del plan); recién con los copys ya creados se
-    pueden generar las imágenes. Cada imagen la genera la IA (OpenAI) usando las
-    referencias y el prompt de Identidad visual — el titular y el logo se agregan aparte,
-    con código, para que salgan siempre nítidos. Las piezas de Email no llevan imagen.
+    pueden generar las imágenes. Cada imagen la genera la IA (OpenAI) usando el prompt de
+    Identidad visual — el titular, la bajada y el logo se agregan aparte, con código, para
+    que salgan siempre nítidos. Las piezas de Email no llevan imagen.
     Todo queda en borrador — todavía no hay cola de aprobación.
   </p>
   <% if (!hayIdentidad) { %>
@@ -79,8 +79,10 @@
 
                 <% if (hayIdentidad) { %>
                   <form method="POST" action="/productos/<%= producto.slug %>/contenido/pieza/<%= p.id %>/imagen-ia">
-                    <label class="muted small">Titular de la imagen (vacío = lo escribe la IA)</label>
+                    <label class="muted small">Titular (vacío = lo escribe la IA)</label>
                     <textarea name="texto_imagen" rows="2"><%= p.texto_imagen || '' %></textarea>
+                    <label class="muted small">Bajada</label>
+                    <textarea name="bajada_imagen" rows="2"><%= p.bajada_imagen || '' %></textarea>
                     <div class="form-actions">
                       <button type="submit"><%= p.imagen_ref ? 'Regenerar imagen' : 'Crear imagen' %></button>
                     </div>

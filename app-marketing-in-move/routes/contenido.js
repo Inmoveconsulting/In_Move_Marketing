@@ -9,7 +9,7 @@ const {
   getPerfilPorId,
   getIdentidadVisualAprobadaActual,
 } = require('../lib/queries');
-const { sugerirCopy, sugerirTextoImagen } = require('../lib/sugerenciasIA');
+const { sugerirCopy, sugerirTitularYBajada } = require('../lib/sugerenciasIA');
 const { generarFondoImagen } = require('../lib/openaiImagenes');
 const { crearImagenPieza } = require('../lib/imagenPieza');
 
@@ -22,9 +22,9 @@ const { crearImagenPieza } = require('../lib/imagenPieza');
 // más de cerca) pero el modo "editar a partir de una foto" de OpenAI termina copiando
 // literal a la persona de esa foto en todas las piezas, sin importar qué se le pida en el
 // texto — así que las referencias sirven para que vos definas el prompt con criterio, no
-// como input directo a la IA. El titular y el logo se agregan aparte, compuestos con
-// código (no se los pedimos a la IA de imagen: el texto que dibuja un modelo de imagen
-// suele salir mal escrito). Las piezas de Email no llevan imagen. Cada pieza entra en
+// como input directo a la IA. El titular + bajada + logo se agregan aparte, compuestos
+// con código (no se los pedimos a la IA de imagen: el texto que dibuja un modelo de
+// imagen suele salir mal escrito). Las piezas de Email no llevan imagen. Cada pieza entra
 // estado "borrador" — la cola de aprobación (Pantalla 4) todavía no está construida, así
 // que por ahora se puede editar/regenerar acá directo.
 
@@ -83,17 +83,20 @@ function tomaAleatoria() {
   return TOMAS[Math.floor(Math.random() * TOMAS.length)];
 }
 
-// Arma el fondo (vía OpenAI) + compone el titular y el logo encima (vía código). Si no
-// se pasa un texto explícito, usa el que ya tenía la pieza o le pide uno a la IA.
-async function generarImagenParaPieza({ pieza, plan, perfil, identidad, textoOverride }) {
+// Arma el fondo (vía OpenAI) + compone el titular + bajada + logo encima (vía código). Si
+// no se pasa un override, usa lo que ya tenía la pieza o le pide un par nuevo a la IA.
+async function generarImagenParaPieza({ pieza, plan, perfil, identidad, titularOverride, bajadaOverride }) {
   const pilarObj = (plan.calendario || []).find((p) => p.pilar === pieza.pilar) || {
     pilar: pieza.pilar,
     descripcion: '',
   };
 
-  let texto = (textoOverride || pieza.texto_imagen || '').trim();
-  if (!texto) {
-    texto = await sugerirTextoImagen({ perfil, pilar: pilarObj, copy: pieza.copy });
+  let titular = (titularOverride || pieza.texto_imagen || '').trim();
+  let bajada = (bajadaOverride || pieza.bajada_imagen || '').trim();
+  if (!titular) {
+    const sugerido = await sugerirTitularYBajada({ perfil, pilar: pilarObj, copy: pieza.copy });
+    titular = sugerido.titular;
+    bajada = sugerido.bajada;
   }
 
   const prompt = `
@@ -121,9 +124,14 @@ No incluyas texto ni logos en la imagen — eso se agrega aparte. Formato cuadra
   // el estilo solo con palabras (el prompt de arriba), así cada pieza sale con personas
   // y escenas distintas de verdad.
   const fondo = await generarFondoImagen({ prompt, referencias: [] });
-  const imagen = await crearImagenPieza({ fondoDataUri: fondo, texto, logoDataUri: identidad.logo });
+  const imagen = await crearImagenPieza({
+    fondoDataUri: fondo,
+    titular,
+    bajada,
+    logoDataUri: identidad.logo,
+  });
 
-  return { imagen, texto };
+  return { imagen, titular, bajada };
 }
 
 router.use(async (req, res, next) => {
@@ -300,8 +308,10 @@ router.post('/generar-imagenes-semana', async (req, res, next) => {
       const r = resultados[i];
       if (r.status === 'fulfilled') {
         await pool.query(
-          'UPDATE contenido_generado SET imagen_ref = $1, texto_imagen = $2, actualizado_en = now() WHERE id = $3',
-          [r.value.imagen, r.value.texto, pendientes[i].id]
+          `UPDATE contenido_generado SET
+             imagen_ref = $1, texto_imagen = $2, bajada_imagen = $3, actualizado_en = now()
+           WHERE id = $4`,
+          [r.value.imagen, r.value.titular, r.value.bajada, pendientes[i].id]
         );
       } else {
         fallos += 1;
@@ -397,17 +407,20 @@ router.post('/pieza/:id/imagen-ia', async (req, res, next) => {
     const plan = planRows[0];
     const perfil = await getPerfilPorId(pieza.perfil_producto_id);
 
-    const { imagen, texto } = await generarImagenParaPieza({
+    const { imagen, titular, bajada } = await generarImagenParaPieza({
       pieza,
       plan,
       perfil,
       identidad,
-      textoOverride: (req.body.texto_imagen || '').trim(),
+      titularOverride: (req.body.texto_imagen || '').trim(),
+      bajadaOverride: (req.body.bajada_imagen || '').trim(),
     });
 
     await pool.query(
-      'UPDATE contenido_generado SET imagen_ref = $1, texto_imagen = $2, actualizado_en = now() WHERE id = $3',
-      [imagen, texto, pieza.id]
+      `UPDATE contenido_generado SET
+         imagen_ref = $1, texto_imagen = $2, bajada_imagen = $3, actualizado_en = now()
+       WHERE id = $4`,
+      [imagen, titular, bajada, pieza.id]
     );
     res.redirect(`/productos/${req.producto.slug}/contenido`);
   } catch (err) {

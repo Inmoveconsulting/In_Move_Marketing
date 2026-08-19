@@ -50,19 +50,36 @@ function envolverTexto(texto, maxCaracteresPorLinea, maxLineas) {
   return lineas;
 }
 
-// SVG del overlay: logo arriba (placa blanca chica) + banda oscura con el titular abajo.
-// Va así, y no al revés, porque la banda arriba terminaba cortando justo la cara de las
-// personas en la foto — abajo suele haber mesa/laptop, corta mucho menos. Transparente en
-// todo lo demás, para que al componer se vea la foto de fondo debajo.
-function construirSvgOverlay({ texto, conLogo }) {
-  const tamañoFuente = 62;
-  const interlineado = 74;
-  const lineas = envolverTexto(texto, 24, 4);
-  const altoBanda = 60 + lineas.length * interlineado + 40;
+// SVG del overlay: logo arriba (placa blanca chica) + banda oscura abajo con dos niveles
+// de texto — titular grande y en negrita, bajada más chica debajo que lo aterriza (mismo
+// patrón que una tarjeta de LinkedIn/Instagram). La banda va abajo y no arriba porque
+// arriba terminaba cortando justo la cara de las personas en la foto — abajo suele haber
+// mesa/laptop, corta mucho menos. Transparente en todo lo demás, para que al componer se
+// vea la foto de fondo debajo.
+function construirSvgOverlay({ titular, bajada, conLogo }) {
+  const tamañoTitular = 58;
+  const interlineadoTitular = 66;
+  const tamañoBajada = 32;
+  const interlineadoBajada = 42;
+  const paddingTop = 56;
+  const paddingBottom = 48;
+  const gapEntreBloques = 18;
+
+  const lineasTitular = envolverTexto(titular, 22, 3);
+  const lineasBajada = bajada ? envolverTexto(bajada, 40, 2) : [];
+
+  const alturaTitular = lineasTitular.length * interlineadoTitular;
+  const alturaBajada = lineasBajada.length ? gapEntreBloques + lineasBajada.length * interlineadoBajada : 0;
+  const altoBanda = paddingTop + alturaTitular + alturaBajada + paddingBottom;
   const yBanda = LADO - altoBanda;
 
-  const textoSvg = lineas
-    .map((linea, i) => `<tspan x="60" dy="${i === 0 ? 0 : interlineado}">${escaparXml(linea)}</tspan>`)
+  const titularSvg = lineasTitular
+    .map((linea, i) => `<tspan x="60" dy="${i === 0 ? 0 : interlineadoTitular}">${escaparXml(linea)}</tspan>`)
+    .join('');
+
+  const yBajada = yBanda + paddingTop + alturaTitular + gapEntreBloques + tamañoBajada * 0.85;
+  const bajadaSvg = lineasBajada
+    .map((linea, i) => `<tspan x="60" dy="${i === 0 ? 0 : interlineadoBajada}">${escaparXml(linea)}</tspan>`)
     .join('');
 
   return `
@@ -74,7 +91,12 @@ function construirSvgOverlay({ texto, conLogo }) {
     </linearGradient>
   </defs>
   <rect x="0" y="${yBanda}" width="${LADO}" height="${altoBanda}" fill="url(#banda)" />
-  <text x="60" y="${yBanda + 60 + tamañoFuente * 0.8}" font-family="Inter" font-size="${tamañoFuente}" fill="#ffffff" font-weight="700">${textoSvg}</text>
+  <text x="60" y="${yBanda + paddingTop + tamañoTitular * 0.8}" font-family="Inter" font-size="${tamañoTitular}" fill="#ffffff" font-weight="700">${titularSvg}</text>
+  ${
+    lineasBajada.length
+      ? `<text x="60" y="${yBajada}" font-family="Inter" font-size="${tamañoBajada}" fill="#e7e9ec" font-weight="400">${bajadaSvg}</text>`
+      : ''
+  }
   ${
     conLogo
       ? `<rect x="40" y="40" width="200" height="100" rx="10" fill="#ffffff" fill-opacity="0.92" />`
@@ -97,7 +119,7 @@ function overlayAPng(svgString) {
   return resvg.render().asPng();
 }
 
-async function crearImagenPieza({ fondoDataUri, texto, logoDataUri }) {
+async function crearImagenPieza({ fondoDataUri, titular, bajada, logoDataUri }) {
   if (!fondoDataUri) {
     throw new Error('Falta una imagen de fondo (subí referencias en Identidad visual).');
   }
@@ -107,7 +129,7 @@ async function crearImagenPieza({ fondoDataUri, texto, logoDataUri }) {
     .resize({ width: LADO, height: LADO, fit: 'cover', position: 'attention' })
     .toBuffer();
 
-  const overlayPng = overlayAPng(construirSvgOverlay({ texto, conLogo: !!logoDataUri }));
+  const overlayPng = overlayAPng(construirSvgOverlay({ titular, bajada, conLogo: !!logoDataUri }));
   const composicion = [{ input: overlayPng, top: 0, left: 0 }];
 
   if (logoDataUri) {

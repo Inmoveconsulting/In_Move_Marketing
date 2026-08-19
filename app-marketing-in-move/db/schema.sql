@@ -110,11 +110,12 @@ CREATE TABLE IF NOT EXISTS identidad_visual_intentos (
 -- calendario del plan (calendario[(semana-1) % calendario.length]).
 --
 -- La imagen de cada pieza: el FONDO lo genera la IA de OpenAI (usando el prompt +
--- referencias de identidad_visual), y el titular + logo se COMPONEN aparte con codigo —
--- el texto sobre imagen generado por un modelo de IA suele salir mal escrito, componerlo
--- a mano garantiza que quede exacto. texto_imagen es el titular corto que se superpone
--- (distinto de copy, que es el texto completo del posteo). Las piezas de canales sin
--- imagen (Email) no la llevan. Tambien se puede subir una imagen propia a mano.
+-- referencias de identidad_visual), y el titular + bajada + logo se COMPONEN aparte con
+-- codigo — el texto sobre imagen generado por un modelo de IA suele salir mal escrito,
+-- componerlo a mano garantiza que quede exacto. texto_imagen es el titular corto y
+-- bajada_imagen la linea de apoyo debajo (distintos de copy, que es el texto completo del
+-- posteo). Las piezas de canales sin imagen (Email) no la llevan. Tambien se puede subir
+-- una imagen propia a mano.
 CREATE TABLE IF NOT EXISTS contenido_generado (
   id SERIAL PRIMARY KEY,
   plan_marketing_id INTEGER NOT NULL REFERENCES planes_marketing(id),
@@ -125,6 +126,7 @@ CREATE TABLE IF NOT EXISTS contenido_generado (
   pilar TEXT,
   copy TEXT,
   texto_imagen TEXT DEFAULT '',
+  bajada_imagen TEXT DEFAULT '',
   imagen_ref TEXT,
   estado TEXT NOT NULL DEFAULT 'borrador', -- borrador | a_revisar | aprobado | rechazado | programado | publicado
   feedback TEXT,
@@ -136,6 +138,7 @@ CREATE TABLE IF NOT EXISTS contenido_generado (
 -- Por si la tabla ya existia de un deploy anterior a que se agregaran estas columnas.
 ALTER TABLE contenido_generado ADD COLUMN IF NOT EXISTS semana INTEGER;
 ALTER TABLE contenido_generado ADD COLUMN IF NOT EXISTS texto_imagen TEXT DEFAULT '';
+ALTER TABLE contenido_generado ADD COLUMN IF NOT EXISTS bajada_imagen TEXT DEFAULT '';
 
 -- Productos iniciales (no pisa nada si ya existen).
 INSERT INTO productos (slug, nombre) VALUES ('talent', 'In Move Talent') ON CONFLICT (slug) DO NOTHING;

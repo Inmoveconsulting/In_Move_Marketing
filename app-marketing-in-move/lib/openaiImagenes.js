@@ -11,6 +11,19 @@
 
 const MODEL = 'gpt-image-1';
 
+// Resuelve prompts con la convención "[opción A | opción B | opción C]" (la usó Nano
+// Banana/Gemini al armar la base del prompt) eligiendo una opción al azar de cada grupo.
+// No confiamos en que gpt-image-1 (OpenAI) entienda esa sintaxis igual que Gemini — la
+// resolvemos nosotros en código para que la variedad funcione seguro sin importar qué
+// modelo se use.
+function resolverOpcionesDePrompt(texto) {
+  return String(texto || '').replace(/\[([^\]]+)\]/g, (match, grupo) => {
+    const opciones = grupo.split('|').map((o) => o.trim()).filter(Boolean);
+    if (opciones.length === 0) return '';
+    return opciones[Math.floor(Math.random() * opciones.length)];
+  });
+}
+
 function dataUriToBlob(dataUri) {
   const match = /^data:(.+?);base64,(.*)$/s.exec(dataUri || '');
   if (!match) {
@@ -32,13 +45,14 @@ async function generarFondoImagen({ prompt, referencias }) {
     throw err;
   }
 
+  const promptResuelto = resolverOpcionesDePrompt(prompt);
   const refs = (referencias || []).filter(Boolean);
   let res;
 
   if (refs.length > 0) {
     const form = new FormData();
     form.append('model', MODEL);
-    form.append('prompt', prompt);
+    form.append('prompt', promptResuelto);
     form.append('size', '1024x1024');
     form.append('n', '1');
     refs.forEach((dataUri, i) => {
@@ -57,7 +71,7 @@ async function generarFondoImagen({ prompt, referencias }) {
         Authorization: `Bearer ${apiKey}`,
         'content-type': 'application/json',
       },
-      body: JSON.stringify({ model: MODEL, prompt, size: '1024x1024', n: 1 }),
+      body: JSON.stringify({ model: MODEL, prompt: promptResuelto, size: '1024x1024', n: 1 }),
     });
   }
 
