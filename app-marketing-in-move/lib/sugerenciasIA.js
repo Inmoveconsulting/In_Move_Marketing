@@ -247,18 +247,21 @@ CONTEXTO ESPECÍFICO:
 ${contextoTexto}
 
 Tarea: escribí un post/artículo de LinkedIn sobre este tema, siguiendo el tono de voz y
-las reglas de la marca. Puede ser más largo (hasta ~1200 caracteres), con saltos de línea
-cortos para que se lea bien. Si corresponde, cerrá con uno de los CTAs ya definidos en el
-perfil de arriba, de forma natural — no inventes CTAs nuevos. Si el tema es más de
+las reglas de la marca (directo, sin relleno, evidencia sobre promesa), con saltos de
+línea cortos para que se lea bien. La extensión depende del tema: para algo breve alcanza
+con unos párrafos; si el contexto pide desarrollo real (un marco teórico, varios conceptos
+vinculados entre sí), extendete lo necesario para armar el argumento con solidez — denso y
+sin vueltas, no largo porque sí. Si corresponde, cerrá con uno de los CTAs ya definidos en
+el perfil de arriba, de forma natural — no inventes CTAs nuevos. Si el tema es más de
 reflexión que de conversión, cerrá invitando a comentar en vez de forzar un CTA.
 
 Devolvé solo el texto final del post.
 `.trim();
 
   // El contexto que escribe la usuaria puede ser largo y detallado (temas con varias
-  // capas) — con maxTokens chico la respuesta se corta a mitad de camino y puede volver
-  // vacía. Le damos bastante margen, sobre todo para artículos.
-  const { text } = await askClaude({ system, prompt, maxTokens: tipo === 'mensaje' ? 800 : 2000 });
+  // capas, marcos teóricos, etc.) — con maxTokens chico la respuesta se corta a mitad de
+  // camino. Le damos bastante margen, sobre todo para artículos que piden desarrollo real.
+  const { text } = await askClaude({ system, prompt, maxTokens: tipo === 'mensaje' ? 800 : 3500 });
   return text.trim();
 }
 
