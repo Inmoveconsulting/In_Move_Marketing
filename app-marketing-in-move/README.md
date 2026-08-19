@@ -6,8 +6,9 @@ No comparte código, base de datos ni configuración con esa app — no la toca.
 
 ## Estado actual
 
-Están construidas la **Pantalla 1 — Perfil de producto**, la **Pantalla 2 — Plan de Marketing**
-y la **Pantalla 3 — Generación de contenido** (identidad visual + generación de copys):
+Están construidas la **Pantalla 1 — Perfil de producto**, la **Pantalla 2 — Plan de Marketing**,
+la **Pantalla 3 — Generación de contenido** (identidad visual + generación de copys) y la
+**Pantalla 3b — Contenido LinkedIn** (mensajes directos y artículos para prospección puntual):
 
 **Pantalla 1:**
 - Selector de producto (pantalla 0) con alta de productos nuevos.
@@ -57,18 +58,35 @@ saber por qué, si en algún momento se vuelve a tocar esta parte:
 2. Cada copy es **editable**, o **"Regenerar copy"** para pedirle a la IA que lo reescriba.
 3. **Paso 2 — imágenes**, recién disponible con los copys ya creados. Botón **"Crear
    imágenes de la semana N"** — genera el fondo de cada pieza con OpenAI (`gpt-image-1`,
-   usando el prompt + referencias de Identidad visual) y le compone encima un titular
-   corto (lo escribe la IA a partir del copy, o lo escribís vos) + el logo. El texto se
-   dibuja con `@resvg/resvg-js` cargando la tipografía Inter directo del archivo
-   (`assets/fonts/`), no con el modelo de imagen. **Las piezas de Email no llevan imagen.**
-4. Por pieza: **"Regenerar imagen"** prueba un fondo y un titular nuevos; **"O subir la
-   mía"** reemplaza todo por un archivo propio.
+   texto solamente, sin adjuntar las referencias como imagen de entrada — ver por qué en
+   Identidad visual) y le compone encima **titular + bajada** (dos niveles: gancho corto en
+   negrita + una oración que lo aterriza con evidencia/beneficio concreto, mismo patrón
+   que una tarjeta de LinkedIn) + el logo. El texto se dibuja con `@resvg/resvg-js`
+   cargando la tipografía Inter directo del archivo (`assets/fonts/`), no con el modelo de
+   imagen. **Las piezas de Email no llevan imagen.**
+4. Por pieza: **"Regenerar imagen"** prueba un fondo, titular y bajada nuevos; **"O subir
+   la mía"** reemplaza todo por un archivo propio.
 5. Todo queda en estado **"borrador"** — la cola de aprobación (Pantalla 4) todavía no
    existe, así que por ahora se edita directo acá.
+
+**Contenido LinkedIn** (Pantalla 3b — requiere un perfil aprobado; independiente del plan,
+no se genera por semana, es una lista suelta de piezas):
+1. **Mensaje directo** — copy solamente (sin imagen, es 1 a 1). Elegís un **tema** de una
+   lista fija ("Presentación / primer contacto", "Caso de éxito relevante", etc., con
+   "Otro" para especificar) + un **contexto** en texto libre (quién es el prospecto, por
+   qué le escribís) → la IA escribe un mensaje corto y genuino, no una plantilla de venta.
+2. **Artículo/post** — mismo patrón de tema + contexto, pero copy + imagen (mismo motor
+   que Contenido: titular + bajada + logo compuestos con código).
+3. **Alcance deliberadamente acotado:** solo genera texto e imagen. Nada de automatizar el
+   envío (eso necesitaría una herramienta tipo Waalaxy, fuera de este MVP) ni de gestionar
+   o conectar listas de prospectos — eso lo hacés vos a mano con lo que se genera acá.
 
 Las sugerencias de IA son eso — sugerencias. Todo queda como borrador editable y nada se aprueba solo; vos revisás y aprobás cada paso, como pide la spec.
 
 Cola de aprobación, publicación y medición (pantallas 4 a 6) **todavía no están construidas**.
+Pendiente además (acordado, no urgente): estructurar los CTAs del perfil con un destino
+real (link/WhatsApp/teléfono/email) en vez de solo texto descriptivo — necesario para
+cuando se conecte con Metricool en la Pantalla 5.
 
 ## Stack (por qué esto y no otra cosa)
 
@@ -91,11 +109,12 @@ app-marketing-in-move/
   routes/planes.js         plan de marketing (pantalla 2)
   routes/identidadVisual.js identidad visual (dentro de la pantalla 3)
   routes/contenido.js      generación de copys + imágenes por pieza (pantalla 3)
+  routes/contenidoLinkedin.js mensajes directos + artículos de LinkedIn (pantalla 3b)
   lib/seedTalent.js        datos reales de In Move Talent v1.1, para el botón "cargar ejemplo"
   lib/queries.js           consultas SQL compartidas entre pantallas
   lib/claude.js            cliente minimo de la API de Claude (sin SDK, un fetch)
-  lib/sugerenciasIA.js     prompts de IA: duración/canales/calendario (pantalla 2), copy y titular de imagen (pantalla 3)
-  lib/imagenPieza.js       compone la imagen de cada pieza: fondo + titular + logo, con código (sin IA de imagen)
+  lib/sugerenciasIA.js     prompts de IA: duración/canales/calendario (pantalla 2), copys y titular+bajada de imagen (pantallas 3 y 3b)
+  lib/imagenPieza.js       compone la imagen de cada pieza: fondo + titular + bajada + logo, con código (sin IA de imagen)
   lib/openaiImagenes.js    cliente de la API de imágenes de OpenAI (gpt-image-1) — genera el fondo de cada pieza
   assets/fonts/            tipografía (Inter, licencia OFL) para dibujar texto sobre las imágenes
   views/                   plantillas EJS
@@ -122,12 +141,18 @@ externo tipo S3) + `prompt_imagen`, el prompt editable que usa cada pieza de Con
 para generar su fondo. No genera ninguna imagen en esta pantalla — solo define la base.
 
 **contenido_generado** — cada pieza referencia el plan y la versión de perfil que la
-generó, más `semana` (el tramo al que pertenece) y `pilar` (cuál usó). `texto_imagen` es
-el titular corto compuesto sobre la imagen (distinto de `copy`, el texto completo del
-posteo). Estado (`borrador` → ... → `publicado`) y `version_origen_id` para cuando una
-pieza se regenera por feedback — hoy regenerar pisa el copy/imagen en el lugar porque
-todavía no hay cola de aprobación que proteja versiones anteriores; cuando se construya
-la Pantalla 4 esto pasa a versionar de verdad.
+generó, más `semana` (el tramo al que pertenece) y `pilar` (cuál usó). `texto_imagen` y
+`bajada_imagen` son los dos niveles de texto compuestos sobre la imagen (distintos de
+`copy`, el texto completo del posteo). Estado (`borrador` → ... → `publicado`) y
+`version_origen_id` para cuando una pieza se regenera por feedback — hoy regenerar pisa el
+copy/imagen en el lugar porque todavía no hay cola de aprobación que proteja versiones
+anteriores; cuando se construya la Pantalla 4 esto pasa a versionar de verdad.
+
+**contenido_linkedin** — Pantalla 3b, independiente del plan (sin `semana` ni `pilar`,
+sin FK a `planes_marketing`). `tipo` es `mensaje` o `articulo`; `tema` sale de una lista
+fija por tipo (o texto libre si se elige "Otro"); `contexto` es la personalización puntual
+(quién es el prospecto / de qué trata). Los mensajes no usan `texto_imagen`/`bajada_imagen`/
+`imagen_ref` — solo los artículos.
 
 Este esqueleto ya cubre la trazabilidad completa que pide la spec: "todo objeto lleva versión
 y trazabilidad de qué versión de qué otro objeto lo originó".
@@ -309,6 +334,18 @@ Cuando te dé archivos nuevos o modificados:
    confirmar que lo respeta en vez de inventar uno.
 7. Confirmá que las piezas de Email no muestran ninguna opción de imagen.
 8. Repetí con la semana 2 para confirmar que rota al segundo pilar del calendario.
+
+## Cómo probar Contenido LinkedIn con datos reales
+
+1. Con el perfil de In Move Talent aprobado, tocá **"LinkedIn"** en el menú de arriba.
+2. En "Nuevo mensaje directo", elegí un tema (ej. "Invitación a conocer el servicio /
+   demo"), escribí un contexto corto (ej. "Gerente de RRHH de una empresa mediana que vi
+   comentando sobre rotación de personal") y **"Generar mensaje"** — debería salir corto,
+   personal, sin sonar a plantilla de venta.
+3. En "Nuevo artículo / post", elegí un tema y contexto, **"Generar artículo"**, y con
+   Identidad visual aprobada tocá **"Crear imagen"** en esa pieza — mismo motor que
+   Contenido (fondo + titular + bajada + logo).
+4. Probá "Otro" en el desplegable de tema para confirmar que toma el texto libre.
 
 ## Qué sigue (no construido todavía)
 

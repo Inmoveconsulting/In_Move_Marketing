@@ -1,0 +1,133 @@
+<%- include('../partials/header') %>
+
+<div class="perfil-header">
+  <div>
+    <h1>Contenido LinkedIn</h1>
+    <span class="muted small">Mensajes directos y artículos para prospección puntual</span>
+  </div>
+  <div class="perfil-actions">
+    <a href="/productos/<%= producto.slug %>/perfil">← perfil de producto</a>
+  </div>
+</div>
+
+<% if (!perfilAprobado) { %>
+  <p class="callout">
+    Este producto todavía no tiene un perfil aprobado. Hace falta aprobar el perfil antes
+    de generar mensajes o artículos —
+    <a href="/productos/<%= producto.slug %>/perfil">ir al perfil de producto</a>.
+  </p>
+<% } else { %>
+
+  <% if (error) { %>
+    <p class="callout callout-error"><%= error %></p>
+  <% } %>
+
+  <p class="field-help">
+    Genera copy (y para artículos, imagen) por pieza suelta — no está atado al plan ni se
+    programa por semana. Solo genera el contenido: no envía nada ni gestiona listas de
+    prospectos, eso lo hacés vos a mano con lo que generás acá.
+  </p>
+
+  <div class="piezas-grid">
+    <section class="plan-section" style="margin-top:0">
+      <h2>Nuevo mensaje directo</h2>
+      <form method="POST" action="/productos/<%= producto.slug %>/linkedin/mensaje">
+        <div class="field">
+          <label for="tema_mensaje">Tema / motivo</label>
+          <select id="tema_mensaje" name="tema">
+            <% temasMensaje.forEach(function (t) { %>
+              <option value="<%= t %>"><%= t %></option>
+            <% }); %>
+          </select>
+        </div>
+        <div class="field">
+          <label for="tema_otro_mensaje">Si elegiste "Otro", especificá acá</label>
+          <input type="text" id="tema_otro_mensaje" name="tema_otro" placeholder="Tema específico">
+        </div>
+        <div class="field">
+          <label for="contexto_mensaje">Contexto — quién es el prospecto, por qué le escribís</label>
+          <textarea id="contexto_mensaje" name="contexto" rows="3"></textarea>
+        </div>
+        <div class="form-actions"><button type="submit">Generar mensaje</button></div>
+      </form>
+    </section>
+
+    <section class="plan-section" style="margin-top:0">
+      <h2>Nuevo artículo / post</h2>
+      <form method="POST" action="/productos/<%= producto.slug %>/linkedin/articulo">
+        <div class="field">
+          <label for="tema_articulo">Tema</label>
+          <select id="tema_articulo" name="tema">
+            <% temasArticulo.forEach(function (t) { %>
+              <option value="<%= t %>"><%= t %></option>
+            <% }); %>
+          </select>
+        </div>
+        <div class="field">
+          <label for="tema_otro_articulo">Si elegiste "Otro", especificá acá</label>
+          <input type="text" id="tema_otro_articulo" name="tema_otro" placeholder="Tema específico">
+        </div>
+        <div class="field">
+          <label for="contexto_articulo">Contexto — de qué trata puntualmente</label>
+          <textarea id="contexto_articulo" name="contexto" rows="3"></textarea>
+        </div>
+        <div class="form-actions"><button type="submit">Generar artículo</button></div>
+      </form>
+    </section>
+  </div>
+
+  <% if (piezas.length > 0) { %>
+    <h2 class="section-title">Piezas generadas</h2>
+    <div class="piezas-grid">
+      <% piezas.forEach(function (p) { %>
+        <div class="pieza-card">
+          <span class="badge badge-vacio"><%= p.tipo === 'mensaje' ? 'Mensaje directo' : 'Artículo' %></span>
+          <p class="muted small"><%= p.tema %></p>
+          <% if (p.contexto) { %><p class="muted small"><%= p.contexto %></p><% } %>
+
+          <form method="POST" action="/productos/<%= producto.slug %>/linkedin/pieza/<%= p.id %>/copy">
+            <textarea name="copy" rows="8"><%= p.copy || '' %></textarea>
+            <div class="form-actions">
+              <button type="submit">Guardar copy</button>
+            </div>
+          </form>
+          <form method="POST" action="/productos/<%= producto.slug %>/linkedin/pieza/<%= p.id %>/regenerar">
+            <button type="submit">Regenerar copy</button>
+          </form>
+
+          <% if (p.tipo === 'articulo') { %>
+            <% if (p.imagen_ref) { %>
+              <img class="identidad-thumb" src="<%= p.imagen_ref %>" alt="Imagen de la pieza">
+            <% } %>
+
+            <% if (hayIdentidad) { %>
+              <form method="POST" action="/productos/<%= producto.slug %>/linkedin/pieza/<%= p.id %>/imagen-ia">
+                <label class="muted small">Titular (vacío = lo escribe la IA)</label>
+                <textarea name="texto_imagen" rows="2"><%= p.texto_imagen || '' %></textarea>
+                <label class="muted small">Bajada</label>
+                <textarea name="bajada_imagen" rows="2"><%= p.bajada_imagen || '' %></textarea>
+                <div class="form-actions">
+                  <button type="submit"><%= p.imagen_ref ? 'Regenerar imagen' : 'Crear imagen' %></button>
+                </div>
+              </form>
+            <% } else { %>
+              <p class="muted small" style="margin-top:10px">
+                Aprobá <a href="/productos/<%= producto.slug %>/identidad-visual">Identidad visual</a> para poder crear la imagen.
+              </p>
+            <% } %>
+
+            <form method="POST" action="/productos/<%= producto.slug %>/linkedin/pieza/<%= p.id %>/imagen" enctype="multipart/form-data">
+              <input type="file" name="imagen" accept="image/*">
+              <div class="form-actions">
+                <button type="submit">O subir la mía</button>
+              </div>
+            </form>
+          <% } %>
+        </div>
+      <% }); %>
+    </div>
+  <% } %>
+
+<% } %>
+
+<%- include('../partials/footer') %>

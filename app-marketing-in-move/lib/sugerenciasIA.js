@@ -205,10 +205,65 @@ Respondé con este JSON exacto, sin nada más alrededor:
   };
 }
 
+// Pantalla 3b — copy para mensajes directos de LinkedIn (1 a 1, prospección puntual) o
+// artículos/posts de LinkedIn, según "tema" (elegido de una lista) + "contexto" (texto
+// libre: quién es el prospecto, o de qué trata puntualmente el artículo). Distinto de
+// sugerirCopy: no depende de un plan/pilar/calendario, es una pieza suelta.
+async function sugerirCopyLinkedin({ perfil, tipo, tema, contexto }) {
+  const system =
+    tipo === 'mensaje'
+      ? 'Sos un experto en prospección B2B por LinkedIn. Escribís en español mensajes directos breves y genuinos, nunca genéricos ni con look de plantilla de venta. Respondés ÚNICAMENTE con el texto final del mensaje — sin explicaciones, sin comillas, sin encabezados.'
+      : 'Sos un copywriter B2B experto en LinkedIn. Escribís en español, siguiendo el tono de voz y las frases guía de la marca. Respondés ÚNICAMENTE con el texto final del post — sin explicaciones, sin comillas, sin encabezados, sin markdown.';
+
+  const contextoTexto = (contexto || '').trim() || '(sin contexto adicional — usá el tema de arriba con criterio)';
+
+  const prompt =
+    tipo === 'mensaje'
+      ? `
+${resumenPerfil(perfil)}
+
+MOTIVO DE ESTE MENSAJE: ${tema}
+
+CONTEXTO ESPECÍFICO (quién es el prospecto, por qué le escribís, cualquier dato para personalizar):
+${contextoTexto}
+
+Tarea: escribí un mensaje directo de LinkedIn (primer contacto o seguimiento), corto (3 a
+5 oraciones), tono genuino y personal — no una plantilla de venta genérica, no empieces
+con fórmulas tipo "Espero que este mensaje te encuentre bien". Seguí el tono de marca de
+arriba. Cerrá con una pregunta o paso siguiente natural y de baja fricción — esto es un
+mensaje 1 a 1, no un posteo, así que sin link ni CTA duro pegado como fórmula.
+
+Devolvé solo el texto del mensaje.
+`.trim()
+      : `
+${resumenPerfil(perfil)}
+
+FRASES Y CONCEPTOS GUÍA DE LA MARCA (usalos si calzan naturalmente, no los fuerces):
+${perfil.frases_guia}
+
+TEMA DE ESTE ARTÍCULO/POST: ${tema}
+
+CONTEXTO ESPECÍFICO:
+${contextoTexto}
+
+Tarea: escribí un post/artículo de LinkedIn sobre este tema, siguiendo el tono de voz y
+las reglas de la marca. Puede ser más largo (hasta ~1200 caracteres), con saltos de línea
+cortos para que se lea bien. Si corresponde, cerrá con uno de los CTAs ya definidos en el
+perfil de arriba, de forma natural — no inventes CTAs nuevos. Si el tema es más de
+reflexión que de conversión, cerrá invitando a comentar en vez de forzar un CTA.
+
+Devolvé solo el texto final del post.
+`.trim();
+
+  const { text } = await askClaude({ system, prompt, maxTokens: 700 });
+  return text.trim();
+}
+
 module.exports = {
   sugerirDuracion,
   sugerirCanales,
   sugerirCalendario,
   sugerirCopy,
   sugerirTitularYBajada,
+  sugerirCopyLinkedin,
 };

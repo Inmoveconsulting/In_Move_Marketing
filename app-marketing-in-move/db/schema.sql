@@ -140,6 +140,29 @@ ALTER TABLE contenido_generado ADD COLUMN IF NOT EXISTS semana INTEGER;
 ALTER TABLE contenido_generado ADD COLUMN IF NOT EXISTS texto_imagen TEXT DEFAULT '';
 ALTER TABLE contenido_generado ADD COLUMN IF NOT EXISTS bajada_imagen TEXT DEFAULT '';
 
+-- contenido_linkedin: Pantalla 3b. Mensajes directos (1 a 1, sin imagen) y artículos/posts
+-- de LinkedIn (con imagen, mismo mecanismo que contenido_generado) para prospección
+-- puntual — independiente del plan/calendario (no se genera por semana, es una lista
+-- suelta de piezas). Alcance deliberadamente acotado: solo genera copy + imagen, nada de
+-- automatizar el envío (eso requeriría una herramienta tipo Waalaxy, fuera de este MVP) ni
+-- de gestionar/conectar listas de prospectos.
+CREATE TABLE IF NOT EXISTS contenido_linkedin (
+  id SERIAL PRIMARY KEY,
+  producto_id INTEGER NOT NULL REFERENCES productos(id),
+  perfil_producto_id INTEGER NOT NULL REFERENCES perfiles_producto(id),
+  tipo TEXT NOT NULL, -- mensaje | articulo
+  tema TEXT NOT NULL,
+  contexto TEXT DEFAULT '',
+  copy TEXT,
+  texto_imagen TEXT DEFAULT '',
+  bajada_imagen TEXT DEFAULT '',
+  imagen_ref TEXT,
+  estado TEXT NOT NULL DEFAULT 'borrador',
+  version_origen_id INTEGER REFERENCES contenido_linkedin(id),
+  creado_en TIMESTAMPTZ NOT NULL DEFAULT now(),
+  actualizado_en TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 -- Productos iniciales (no pisa nada si ya existen).
 INSERT INTO productos (slug, nombre) VALUES ('talent', 'In Move Talent') ON CONFLICT (slug) DO NOTHING;
 INSERT INTO productos (slug, nombre) VALUES ('readiness', 'In Move Readiness') ON CONFLICT (slug) DO NOTHING;
