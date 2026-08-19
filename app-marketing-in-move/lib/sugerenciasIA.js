@@ -121,8 +121,10 @@ oraciones cortas, no más) para que la respuesta no se corte, y no agregues camp
 
 // Pantalla 3 — genera el copy de una pieza puntual, usando el perfil + la fila del
 // calendario (pilar) correspondiente + el canal, como pide la spec. Un texto plano, no
-// JSON — no hay estructura que parsear, solo el copy final.
-async function sugerirCopy({ perfil, objetivoPlan, pilar, canal }) {
+// JSON — no hay estructura que parsear, solo el copy final. feedbackPrevio (opcional):
+// cuando viene de "pedir cambios" en la Cola de aprobación (Pantalla 4), se incorpora el
+// pedido puntual en vez de regenerar a ciegas.
+async function sugerirCopy({ perfil, objetivoPlan, pilar, canal, feedbackPrevio }) {
   const system =
     'Sos un copywriter B2B experto. Escribís en español, siguiendo el tono de voz y las frases guía de la marca que se te dan. Respondés ÚNICAMENTE con el texto final del copy — sin explicaciones, sin comillas, sin encabezados, sin markdown.';
 
@@ -153,7 +155,11 @@ las reglas de la marca. Adaptá longitud y formato a las convenciones del canal:
 Si el CTA de arriba no es "sin CTA duro", cerrá el copy con ese llamado a la acción de
 forma natural, no pegado como una fórmula. Si es "sin CTA duro", el cierre puede invitar a
 comentar o reflexionar, sin CTA de conversión.
-
+${
+  feedbackPrevio
+    ? `\nESTE COPY YA SE HABÍA GENERADO Y PIDIERON UN CAMBIO PUNTUAL — no repitas lo mismo con ajustes cosméticos, reescribilo incorporando este pedido:\n${feedbackPrevio}\n`
+    : ''
+}
 Devolvé solo el texto final del copy, listo para publicar.
 `.trim();
 
@@ -209,7 +215,7 @@ Respondé con este JSON exacto, sin nada más alrededor:
 // artículos/posts de LinkedIn, según "tema" (elegido de una lista) + "contexto" (texto
 // libre: quién es el prospecto, o de qué trata puntualmente el artículo). Distinto de
 // sugerirCopy: no depende de un plan/pilar/calendario, es una pieza suelta.
-async function sugerirCopyLinkedin({ perfil, tipo, tema, contexto }) {
+async function sugerirCopyLinkedin({ perfil, tipo, tema, contexto, feedbackPrevio }) {
   const system =
     tipo === 'mensaje'
       ? 'Sos un experto en prospección B2B por LinkedIn. Escribís en español mensajes directos breves y genuinos, nunca genéricos ni con look de plantilla de venta. Respondés ÚNICAMENTE con el texto final del mensaje — sin explicaciones, sin comillas, sin encabezados.'
@@ -232,7 +238,11 @@ Tarea: escribí un mensaje directo de LinkedIn (primer contacto o seguimiento), 
 con fórmulas tipo "Espero que este mensaje te encuentre bien". Seguí el tono de marca de
 arriba. Cerrá con una pregunta o paso siguiente natural y de baja fricción — esto es un
 mensaje 1 a 1, no un posteo, así que sin link ni CTA duro pegado como fórmula.
-
+${
+  feedbackPrevio
+    ? `\nESTE MENSAJE YA SE HABÍA GENERADO Y PIDIERON UN CAMBIO PUNTUAL — no repitas lo mismo con ajustes cosméticos, reescribilo incorporando este pedido:\n${feedbackPrevio}\n`
+    : ''
+}
 Devolvé solo el texto del mensaje.
 `.trim()
       : `
@@ -254,7 +264,11 @@ vinculados entre sí), extendete lo necesario para armar el argumento con solide
 sin vueltas, no largo porque sí. Si corresponde, cerrá con uno de los CTAs ya definidos en
 el perfil de arriba, de forma natural — no inventes CTAs nuevos. Si el tema es más de
 reflexión que de conversión, cerrá invitando a comentar en vez de forzar un CTA.
-
+${
+  feedbackPrevio
+    ? `\nESTE POST YA SE HABÍA GENERADO Y PIDIERON UN CAMBIO PUNTUAL — no repitas lo mismo con ajustes cosméticos, reescribilo incorporando este pedido:\n${feedbackPrevio}\n`
+    : ''
+}
 Devolvé solo el texto final del post.
 `.trim();
 

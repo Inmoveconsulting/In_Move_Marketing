@@ -7,8 +7,9 @@ No comparte código, base de datos ni configuración con esa app — no la toca.
 ## Estado actual
 
 Están construidas la **Pantalla 1 — Perfil de producto**, la **Pantalla 2 — Plan de Marketing**,
-la **Pantalla 3 — Generación de contenido** (identidad visual + generación de copys) y la
-**Pantalla 3b — Contenido LinkedIn** (mensajes directos y artículos para prospección puntual):
+la **Pantalla 3 — Generación de contenido** (identidad visual + generación de copys), la
+**Pantalla 3b — Contenido LinkedIn** (mensajes directos y artículos para prospección puntual)
+y la **Pantalla 4 — Cola de aprobación**:
 
 **Pantalla 1:**
 - Selector de producto (pantalla 0) con alta de productos nuevos.
@@ -81,9 +82,24 @@ no se genera por semana, es una lista suelta de piezas):
    envío (eso necesitaría una herramienta tipo Waalaxy, fuera de este MVP) ni de gestionar
    o conectar listas de prospectos — eso lo hacés vos a mano con lo que se genera acá.
 
+**Cola de aprobación** (Pantalla 4 — el gate central de la spec; junta piezas de Contenido
+y de Contenido LinkedIn en una sola lista):
+1. Muestra piezas en estado **"borrador"** o **"a_revisar"** — copy e imagen visibles
+   juntos. Las aprobadas/rechazadas salen de la lista (no se borran, solo cambian de
+   estado).
+2. Tres acciones por pieza: **"Aprobar"** / **"Rechazar"** / **"Pedir cambios"** — escribís
+   feedback en texto y regenera **solo esa pieza** (el copy, incorporando tu pedido puntual
+   en el prompt en vez de tirar una versión nueva a ciegas), y vuelve a "borrador" para
+   otra vuelta de revisión.
+3. **Si editás y volvés a aprobar el perfil** (Pantalla 1), las piezas ya generadas con la
+   versión anterior — de Contenido y de Contenido LinkedIn, estén en borrador o ya
+   aprobadas — se marcan automáticamente **"a_revisar"**, con aviso en esta pantalla. No se
+   borran ni se tocan solas, es un aviso para que decidas si siguen sirviendo o hay que
+   regenerarlas.
+
 Las sugerencias de IA son eso — sugerencias. Todo queda como borrador editable y nada se aprueba solo; vos revisás y aprobás cada paso, como pide la spec.
 
-Cola de aprobación, publicación y medición (pantallas 4 a 6) **todavía no están construidas**.
+Publicación y medición (pantallas 5 y 6) **todavía no están construidas**.
 Pendiente además (acordado, no urgente): estructurar los CTAs del perfil con un destino
 real (link/WhatsApp/teléfono/email) en vez de solo texto descriptivo — necesario para
 cuando se conecte con Metricool en la Pantalla 5.
@@ -110,6 +126,7 @@ app-marketing-in-move/
   routes/identidadVisual.js identidad visual (dentro de la pantalla 3)
   routes/contenido.js      generación de copys + imágenes por pieza (pantalla 3)
   routes/contenidoLinkedin.js mensajes directos + artículos de LinkedIn (pantalla 3b)
+  routes/aprobacion.js     cola de aprobación — aprobar/rechazar/pedir cambios (pantalla 4)
   lib/seedTalent.js        datos reales de In Move Talent v1.1, para el botón "cargar ejemplo"
   lib/queries.js           consultas SQL compartidas entre pantallas
   lib/claude.js            cliente minimo de la API de Claude (sin SDK, un fetch)
@@ -143,16 +160,18 @@ para generar su fondo. No genera ninguna imagen en esta pantalla — solo define
 **contenido_generado** — cada pieza referencia el plan y la versión de perfil que la
 generó, más `semana` (el tramo al que pertenece) y `pilar` (cuál usó). `texto_imagen` y
 `bajada_imagen` son los dos niveles de texto compuestos sobre la imagen (distintos de
-`copy`, el texto completo del posteo). Estado (`borrador` → ... → `publicado`) y
-`version_origen_id` para cuando una pieza se regenera por feedback — hoy regenerar pisa el
-copy/imagen en el lugar porque todavía no hay cola de aprobación que proteja versiones
-anteriores; cuando se construya la Pantalla 4 esto pasa a versionar de verdad.
+`copy`, el texto completo del posteo). Estado: `borrador` → `aprobado` (o `rechazado`) vía
+la Cola de aprobación (Pantalla 4); `a_revisar` cuando el perfil que la generó ya no es el
+aprobado actual. `feedback` guarda el último pedido de cambios (Pantalla 4, "Pedir
+cambios" regenera el copy incorporándolo). `version_origen_id` queda para cuando esto
+versione de verdad en vez de pisar en el lugar (todavía no se usa activamente).
 
 **contenido_linkedin** — Pantalla 3b, independiente del plan (sin `semana` ni `pilar`,
 sin FK a `planes_marketing`). `tipo` es `mensaje` o `articulo`; `tema` sale de una lista
 fija por tipo (o texto libre si se elige "Otro"); `contexto` es la personalización puntual
 (quién es el prospecto / de qué trata). Los mensajes no usan `texto_imagen`/`bajada_imagen`/
-`imagen_ref` — solo los artículos.
+`imagen_ref` — solo los artículos. Mismo patrón de `estado`/`feedback` que
+`contenido_generado`, mismo gate de la Pantalla 4.
 
 Este esqueleto ya cubre la trazabilidad completa que pide la spec: "todo objeto lleva versión
 y trazabilidad de qué versión de qué otro objeto lo originó".
@@ -347,9 +366,22 @@ Cuando te dé archivos nuevos o modificados:
    Contenido (fondo + titular + bajada + logo).
 4. Probá "Otro" en el desplegable de tema para confirmar que toma el texto libre.
 
+## Cómo probar la Cola de aprobación con datos reales
+
+1. Con piezas generadas en Contenido y/o Contenido LinkedIn, tocá **"Aprobación"** en el
+   menú de arriba — deberías ver todas juntas, copy e imagen visibles.
+2. Tocá **"Aprobar"** en una pieza — tiene que desaparecer de la lista (quedó en estado
+   `aprobado`, no se borró).
+3. En otra, escribí algo en **"Pedir cambios"** (ej. "más corto, sacá la mención al
+   precio") y tocá **"Regenerar con este feedback"** — el copy nuevo tiene que reflejar
+   ese pedido puntual, no ser una versión random distinta.
+4. Tocá **"Rechazar"** en otra — también sale de la lista.
+5. Para probar el marcado automático "a_revisar": con al menos una pieza ya aprobada acá,
+   andá al Perfil de producto, editá algo (crea versión nueva) y **aprobala**. Volvé a
+   Aprobación — esa pieza vieja debería reaparecer con el badge "A revisar — el perfil
+   cambió desde que se generó".
+
 ## Qué sigue (no construido todavía)
 
-Cola de aprobación (Pantalla 4 — gate central: aprobar / pedir cambios / rechazar cada
-pieza, y marcar como "a revisar" las piezas generadas con una versión de perfil vieja
-cuando el perfil cambia), publicación vía Metricool (Pantalla 5), y medición con
-recomendación de próximo plan (Pantalla 6).
+Publicación vía Metricool (Pantalla 5) y medición con recomendación de próximo plan
+(Pantalla 6).

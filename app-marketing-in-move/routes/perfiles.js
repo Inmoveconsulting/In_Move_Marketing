@@ -87,12 +87,16 @@ router.post('/', async (req, res, next) => {
 });
 
 // Aprobar: guarda los cambios pendientes del formulario (por si se edito y se aprobo
-// en el mismo paso) y congela la version.
+// en el mismo paso) y congela la version. Si ya habia una version aprobada antes de esta
+// (osea, esto es una re-aprobacion tras una edicion), marca como "a_revisar" las piezas
+// de Contenido y Contenido LinkedIn que se generaron con la version vieja — no las borra,
+// solo avisa en la Cola de aprobacion (Pantalla 4) que quedaron desactualizadas.
 router.post('/aprobar', async (req, res, next) => {
   try {
     const versiones = await getVersiones(req.producto.id);
     const actual = versiones[0];
     if (actual && actual.estado === 'borrador') {
+      const habiaAprobadaAntes = versiones.some((v) => v.estado === 'aprobado');
       const valores = CAMPOS.map((c) => (req.body[c] || '').trim());
       await pool.query(
         `UPDATE perfiles_producto SET
@@ -102,6 +106,21 @@ router.post('/aprobar', async (req, res, next) => {
          WHERE id = $9`,
         [...valores, actual.id]
       );
+
+      if (habiaAprobadaAntes) {
+        await pool.query(
+          `UPDATE contenido_generado SET estado = 'a_revisar', actualizado_en = now()
+           WHERE perfil_producto_id != $1
+             AND estado IN ('borrador', 'aprobado')
+             AND plan_marketing_id IN (SELECT id FROM planes_marketing WHERE producto_id = $2)`,
+          [actual.id, req.producto.id]
+        );
+        await pool.query(
+          `UPDATE contenido_linkedin SET estado = 'a_revisar', actualizado_en = now()
+           WHERE perfil_producto_id != $1 AND producto_id = $2 AND estado IN ('borrador', 'aprobado')`,
+          [actual.id, req.producto.id]
+        );
+      }
     }
     res.redirect(`/productos/${req.producto.slug}/perfil`);
   } catch (err) {

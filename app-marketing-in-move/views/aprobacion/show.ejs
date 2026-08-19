@@ -1,0 +1,70 @@
+<%- include('../partials/header') %>
+
+<div class="perfil-header">
+  <div>
+    <h1>Cola de aprobación</h1>
+    <span class="muted small"><%= piezas.length %> pieza(s) pendiente(s)</span>
+  </div>
+</div>
+
+<% if (error) { %>
+  <p class="callout callout-error"><%= error %></p>
+<% } %>
+
+<p class="field-help">
+  Todo lo generado en Contenido y en Contenido LinkedIn pasa por acá antes de considerarse
+  listo. Copy e imagen juntos, para decidir de una — aprobar, pedir cambios (con feedback,
+  regenera solo esa pieza) o rechazar. Nada se borra: lo rechazado queda guardado, solo
+  sale de esta lista.
+</p>
+
+<% if (piezas.length === 0) { %>
+  <p class="callout">No hay piezas pendientes de revisión ahora mismo.</p>
+<% } else { %>
+  <div class="piezas-grid">
+    <% piezas.forEach(function (p) { %>
+      <div class="pieza-card">
+        <% if (p.estado === 'a_revisar') { %>
+          <span class="badge badge-borrador">A revisar — el perfil cambió desde que se generó</span>
+        <% } %>
+        <span class="badge badge-vacio">
+          <%= p.origen === 'linkedin' ? (p.tipo === 'mensaje' ? 'Mensaje directo' : 'Artículo LinkedIn') : p.canal %>
+        </span>
+        <% if (p.origen === 'contenido') { %>
+          <p class="muted small">Semana <%= p.semana %> · <%= p.pilar %></p>
+        <% } else { %>
+          <p class="muted small"><%= p.tema %></p>
+        <% } %>
+
+        <div class="field-readonly"><%= p.copy %></div>
+
+        <% if (p.imagen_ref) { %>
+          <img class="identidad-thumb" src="<%= p.imagen_ref %>" alt="Imagen de la pieza">
+        <% } %>
+
+        <% if (p.feedback) { %>
+          <p class="muted small">Último feedback: <%= p.feedback %></p>
+        <% } %>
+
+        <div class="form-actions">
+          <form method="POST" action="/productos/<%= producto.slug %>/aprobacion/pieza/<%= p.origen %>/<%= p.id %>/aprobar">
+            <button type="submit" class="btn-primary">Aprobar</button>
+          </form>
+          <form method="POST" action="/productos/<%= producto.slug %>/aprobacion/pieza/<%= p.origen %>/<%= p.id %>/rechazar">
+            <button type="submit">Rechazar</button>
+          </form>
+        </div>
+
+        <form method="POST" action="/productos/<%= producto.slug %>/aprobacion/pieza/<%= p.origen %>/<%= p.id %>/pedir-cambios">
+          <label class="muted small">Pedir cambios — qué querés que cambie</label>
+          <textarea name="feedback" rows="2" placeholder="Ej: más corto, sacá la mención al precio, tono más directo"></textarea>
+          <div class="form-actions">
+            <button type="submit">Regenerar con este feedback</button>
+          </div>
+        </form>
+      </div>
+    <% }); %>
+  </div>
+<% } %>
+
+<%- include('../partials/footer') %>

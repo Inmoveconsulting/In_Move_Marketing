@@ -157,11 +157,15 @@ CREATE TABLE IF NOT EXISTS contenido_linkedin (
   texto_imagen TEXT DEFAULT '',
   bajada_imagen TEXT DEFAULT '',
   imagen_ref TEXT,
-  estado TEXT NOT NULL DEFAULT 'borrador',
+  estado TEXT NOT NULL DEFAULT 'borrador', -- borrador | a_revisar | aprobado | rechazado
+  feedback TEXT,
   version_origen_id INTEGER REFERENCES contenido_linkedin(id),
   creado_en TIMESTAMPTZ NOT NULL DEFAULT now(),
   actualizado_en TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Por si la tabla ya existia de un deploy anterior a que se agregara feedback.
+ALTER TABLE contenido_linkedin ADD COLUMN IF NOT EXISTS feedback TEXT;
 
 -- Productos iniciales (no pisa nada si ya existen).
 INSERT INTO productos (slug, nombre) VALUES ('talent', 'In Move Talent') ON CONFLICT (slug) DO NOTHING;

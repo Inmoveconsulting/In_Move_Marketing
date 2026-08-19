@@ -63,9 +63,10 @@
             <div class="pieza-card">
               <span class="badge badge-vacio"><%= p.canal %></span>
               <form method="POST" action="/productos/<%= producto.slug %>/contenido/pieza/<%= p.id %>/copy">
-                <textarea name="copy" rows="8"><%= p.copy || '' %></textarea>
+                <textarea id="copy-<%= p.id %>" name="copy" rows="8"><%= p.copy || '' %></textarea>
                 <div class="form-actions">
                   <button type="submit">Guardar copy</button>
+                  <button type="button" class="btn-copiar" data-target="copy-<%= p.id %>">📋 Copiar</button>
                 </div>
               </form>
               <form method="POST" action="/productos/<%= producto.slug %>/contenido/pieza/<%= p.id %>/regenerar">

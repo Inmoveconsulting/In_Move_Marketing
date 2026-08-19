@@ -14,3 +14,22 @@ document.addEventListener('submit', function (e) {
   boton.dataset.textoOriginal = boton.textContent;
   boton.textContent = 'Procesando…';
 });
+
+// Botón "Copiar" junto a un textarea (copy de una pieza, en Contenido y Contenido
+// LinkedIn) — copia el texto al portapapeles sin tener que seleccionar todo a mano.
+document.addEventListener('click', function (e) {
+  const boton = e.target.closest('.btn-copiar');
+  if (!boton) return;
+
+  const destino = document.getElementById(boton.dataset.target);
+  if (!destino) return;
+
+  navigator.clipboard.writeText(destino.value).then(function () {
+    const original = boton.dataset.textoOriginal || boton.textContent;
+    boton.dataset.textoOriginal = original;
+    boton.textContent = '✓ Copiado';
+    setTimeout(function () {
+      boton.textContent = original;
+    }, 1500);
+  });
+});
