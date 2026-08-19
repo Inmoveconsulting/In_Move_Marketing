@@ -255,7 +255,10 @@ reflexión que de conversión, cerrá invitando a comentar en vez de forzar un C
 Devolvé solo el texto final del post.
 `.trim();
 
-  const { text } = await askClaude({ system, prompt, maxTokens: 700 });
+  // El contexto que escribe la usuaria puede ser largo y detallado (temas con varias
+  // capas) — con maxTokens chico la respuesta se corta a mitad de camino y puede volver
+  // vacía. Le damos bastante margen, sobre todo para artículos.
+  const { text } = await askClaude({ system, prompt, maxTokens: tipo === 'mensaje' ? 800 : 2000 });
   return text.trim();
 }
 
