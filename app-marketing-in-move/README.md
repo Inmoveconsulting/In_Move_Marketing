@@ -14,9 +14,10 @@ y la **Pantalla 4 — Cola de aprobación**:
 **Pantalla 1:**
 - Selector de producto (pantalla 0) con alta de productos nuevos.
 - Formulario de los 8 campos del perfil.
-- Estado borrador / aprobado, con versionado (aprobar congela; editar un aprobado crea versión nueva).
+- **CTAs con destino real** (aparte de los 8 campos): lista de filas nombre + tipo (link / WhatsApp / teléfono / email) + destino real, pensada para la futura Pantalla 5 (Metricool) — el "nombre" tiene que coincidir con cómo se lo llama en "CTAs por etapa" y en el "cta" de cada pilar del calendario del plan, para poder emparejar por nombre y resolver el link/contacto real al publicar. Filas dinámicas (agregar/quitar) con JS simple, sin framework.
+- Estado borrador / aprobado, con versionado (aprobar congela; editar un aprobado crea versión nueva) — los CTAs estructurados viajan con cada versión igual que el resto de los campos.
 - Historial de versiones.
-- Botón para cargar el perfil real de In Move Talent (v1.1, ya aprobado) y probar la pantalla con datos reales sin tipear todo a mano.
+- Botón para cargar el perfil real de In Move Talent (v1.1, ya aprobado) y probar la pantalla con datos reales sin tipear todo a mano (los CTAs estructurados no vienen pre-cargados ahí — hay que sumarlos a mano editando la versión).
 
 **Pantalla 2** (requiere un perfil aprobado — si no hay ninguno, te manda de vuelta a la Pantalla 1):
 1. **Objetivo del plan** — campo obligatorio, bloquea el resto hasta completarlo.
@@ -370,16 +371,21 @@ Cuando te dé archivos nuevos o modificados:
 
 1. Con piezas generadas en Contenido y/o Contenido LinkedIn, tocá **"Aprobación"** en el
    menú de arriba — deberías ver todas juntas, copy e imagen visibles.
-2. Tocá **"Aprobar"** en una pieza — tiene que desaparecer de la lista (quedó en estado
-   `aprobado`, no se borró).
+2. Tocá **"Aprobar"** en una pieza — sale de la cola de pendientes (quedó en estado
+   `aprobado`, no se borró) y aparece arriba de todo en el checklist **"✓ Ya procesadas"**
+   (una línea con tilde verde por pieza, ordenadas de la más reciente a la más vieja) —
+   pensado para no perder de vista qué se aprobó realmente, ya que salir de la lista de
+   pendientes solía dar la sensación de "¿esto habrá corrido?".
 3. En otra, escribí algo en **"Pedir cambios"** (ej. "más corto, sacá la mención al
    precio") y tocá **"Regenerar con este feedback"** — el copy nuevo tiene que reflejar
    ese pedido puntual, no ser una versión random distinta.
-4. Tocá **"Rechazar"** en otra — también sale de la lista.
+4. Tocá **"Rechazar"** en otra — sale de la lista de pendientes (no aparece en el checklist
+   de aprobadas, tampoco se borra).
 5. Para probar el marcado automático "a_revisar": con al menos una pieza ya aprobada acá,
    andá al Perfil de producto, editá algo (crea versión nueva) y **aprobala**. Volvé a
    Aprobación — esa pieza vieja debería reaparecer con el badge "A revisar — el perfil
-   cambió desde que se generó".
+   cambió desde que se generó" (y salir del checklist de aprobadas, porque ya no está en
+   `aprobado`).
 
 ## Qué sigue (no construido todavía)
 

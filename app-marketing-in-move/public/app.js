@@ -33,3 +33,33 @@ document.addEventListener('click', function (e) {
     }, 1500);
   });
 });
+
+// Perfil de producto — agregar/quitar filas de "CTAs con destino real" (Pantalla 1).
+// Cada fila son 3 inputs con nombre repetido cta_nombre[]/cta_tipo[]/cta_destino[] —
+// el server los reconstruye en un array por posicion, asi que agregar/quitar filas del
+// medio no rompe el emparejamiento.
+document.addEventListener('click', function (e) {
+  if (e.target && e.target.id === 'btn-agregar-cta') {
+    const cont = document.getElementById('cta-filas');
+    if (!cont) return;
+    const fila = document.createElement('div');
+    fila.className = 'cta-fila';
+    fila.innerHTML =
+      '<input type="text" name="cta_nombre[]" placeholder="Nombre del CTA (ej: Conoce el proceso)">' +
+      '<select name="cta_tipo[]">' +
+      '<option value="link">Link</option>' +
+      '<option value="whatsapp">WhatsApp</option>' +
+      '<option value="telefono">Teléfono</option>' +
+      '<option value="email">Email</option>' +
+      '</select>' +
+      '<input type="text" name="cta_destino[]" placeholder="URL, número o dirección real">' +
+      '<button type="button" class="btn-quitar-cta">Quitar</button>';
+    cont.appendChild(fila);
+    return;
+  }
+
+  const quitar = e.target.closest && e.target.closest('.btn-quitar-cta');
+  if (quitar) {
+    quitar.closest('.cta-fila').remove();
+  }
+});

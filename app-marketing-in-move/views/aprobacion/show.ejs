@@ -18,6 +18,26 @@
   sale de esta lista.
 </p>
 
+<% if (piezasAprobadas.length > 0) { %>
+  <details class="aprobadas-checklist" open>
+    <summary>✓ Ya procesadas (<%= piezasAprobadas.length %>)</summary>
+    <ul>
+      <% piezasAprobadas.forEach(function (p) { %>
+        <li>
+          <span class="check-verde">✓</span>
+          <%= p.origen === 'linkedin' ? (p.tipo === 'mensaje' ? 'Mensaje directo' : 'Artículo LinkedIn') : p.canal %>
+          <% if (p.origen === 'contenido') { %>
+            · Semana <%= p.semana %> · <%= p.pilar %>
+          <% } else { %>
+            · <%= p.tema %>
+          <% } %>
+          <span class="muted small">— aprobada <%= new Date(p.actualizado_en).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) %></span>
+        </li>
+      <% }); %>
+    </ul>
+  </details>
+<% } %>
+
 <% if (piezas.length === 0) { %>
   <p class="callout">No hay piezas pendientes de revisión ahora mismo.</p>
 <% } else { %>

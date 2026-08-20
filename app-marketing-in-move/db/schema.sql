@@ -22,12 +22,19 @@ CREATE TABLE IF NOT EXISTS perfiles_producto (
   frases_guia TEXT DEFAULT '',
   ejemplos_referencia TEXT DEFAULT '',
   ctas_por_etapa TEXT DEFAULT '',
+  ctas_estructurados TEXT DEFAULT '[]', -- [{nombre, tipo: link|whatsapp|telefono|email, destino}]
   version_origen_id INTEGER REFERENCES perfiles_producto(id),
   creado_en TIMESTAMPTZ NOT NULL DEFAULT now(),
   actualizado_en TIMESTAMPTZ NOT NULL DEFAULT now(),
   aprobado_en TIMESTAMPTZ,
   UNIQUE(producto_id, version)
 );
+
+-- Por si la tabla ya existia de un deploy anterior a que se agregara ctas_estructurados.
+-- Ver Pantalla 5 (Publicacion / Metricool): el "nombre" de cada CTA estructurado tiene que
+-- coincidir con como se lo nombra en ctas_por_etapa y en el "cta" de cada pilar del
+-- calendario del plan, para que la publicacion pueda encontrar el destino real por nombre.
+ALTER TABLE perfiles_producto ADD COLUMN IF NOT EXISTS ctas_estructurados TEXT DEFAULT '[]';
 
 -- planes_marketing: Pantalla 2. Mismo patron de version/estado que perfiles_producto.
 -- perfil_producto_id NOT NULL obliga a que todo plan quede atado a una version aprobada

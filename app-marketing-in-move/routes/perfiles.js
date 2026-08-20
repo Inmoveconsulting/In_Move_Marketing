@@ -20,6 +20,37 @@ const CAMPOS = [
   'ctas_por_etapa',
 ];
 
+// CTAs estructurados (nombre + tipo + destino real) — aparte de CAMPOS porque no es un
+// texto simple sino una lista de filas (arrays paralelos cta_nombre[]/cta_tipo[]/
+// cta_destino[] del formulario). Se guarda como JSON en texto. El "nombre" de cada uno
+// deberia coincidir con como se lo nombra en "ctas_por_etapa" (arriba) y en el "cta" de
+// cada pilar del calendario del plan — asi la Pantalla 5 (Metricool) puede encontrar el
+// destino real por nombre en vez de solo tener la frase descriptiva.
+function parseCtasEstructurados(body) {
+  const nombres = [].concat(body['cta_nombre[]'] || []);
+  const tipos = [].concat(body['cta_tipo[]'] || []);
+  const destinos = [].concat(body['cta_destino[]'] || []);
+  const ctas = [];
+  for (let i = 0; i < nombres.length; i++) {
+    const nombre = (nombres[i] || '').trim();
+    const destino = (destinos[i] || '').trim();
+    if (!nombre && !destino) continue; // fila vacia (se dejo en blanco), se ignora
+    const tipo = ['link', 'whatsapp', 'telefono', 'email'].includes(tipos[i]) ? tipos[i] : 'link';
+    ctas.push({ nombre, tipo, destino });
+  }
+  return JSON.stringify(ctas);
+}
+
+function parseCtasGuardadas(perfil) {
+  if (!perfil || !perfil.ctas_estructurados) return [];
+  try {
+    const parsed = JSON.parse(perfil.ctas_estructurados);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (err) {
+    return [];
+  }
+}
+
 router.use(async (req, res, next) => {
   try {
     const producto = await getProducto(req.params.slug);
@@ -45,6 +76,7 @@ router.get('/', async (req, res, next) => {
       totalVersiones: versiones.length,
       puedeSeedTalent: req.producto.slug === 'talent' && versiones.length === 0,
       hayPerfilAprobado: versiones.some((v) => v.estado === 'aprobado'),
+      ctasEstructurados: parseCtasGuardadas(actual),
     });
   } catch (err) {
     next(err);
@@ -58,23 +90,25 @@ router.post('/', async (req, res, next) => {
     const versiones = await getVersiones(req.producto.id);
     const actual = versiones[0] || null;
     const valores = CAMPOS.map((c) => (req.body[c] || '').trim());
+    const ctasJson = parseCtasEstructurados(req.body);
 
     if (!actual) {
       await pool.query(
         `INSERT INTO perfiles_producto
           (producto_id, version, estado, identidad, publico_objetivo, dolor_solucion,
-           objetivo_crecimiento, tono_voz, frases_guia, ejemplos_referencia, ctas_por_etapa)
-         VALUES ($1, 1, 'borrador', $2, $3, $4, $5, $6, $7, $8, $9)`,
-        [req.producto.id, ...valores]
+           objetivo_crecimiento, tono_voz, frases_guia, ejemplos_referencia, ctas_por_etapa,
+           ctas_estructurados)
+         VALUES ($1, 1, 'borrador', $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+        [req.producto.id, ...valores, ctasJson]
       );
     } else if (actual.estado === 'borrador') {
       await pool.query(
         `UPDATE perfiles_producto SET
            identidad = $1, publico_objetivo = $2, dolor_solucion = $3, objetivo_crecimiento = $4,
            tono_voz = $5, frases_guia = $6, ejemplos_referencia = $7, ctas_por_etapa = $8,
-           actualizado_en = now()
-         WHERE id = $9`,
-        [...valores, actual.id]
+           ctas_estructurados = $9, actualizado_en = now()
+         WHERE id = $10`,
+        [...valores, ctasJson, actual.id]
       );
     }
     // si actual.estado === 'aprobado', no se toca: se ignora (la vista no deberia
@@ -98,13 +132,14 @@ router.post('/aprobar', async (req, res, next) => {
     if (actual && actual.estado === 'borrador') {
       const habiaAprobadaAntes = versiones.some((v) => v.estado === 'aprobado');
       const valores = CAMPOS.map((c) => (req.body[c] || '').trim());
+      const ctasJson = parseCtasEstructurados(req.body);
       await pool.query(
         `UPDATE perfiles_producto SET
            identidad = $1, publico_objetivo = $2, dolor_solucion = $3, objetivo_crecimiento = $4,
            tono_voz = $5, frases_guia = $6, ejemplos_referencia = $7, ctas_por_etapa = $8,
-           estado = 'aprobado', aprobado_en = now(), actualizado_en = now()
-         WHERE id = $9`,
-        [...valores, actual.id]
+           ctas_estructurados = $9, estado = 'aprobado', aprobado_en = now(), actualizado_en = now()
+         WHERE id = $10`,
+        [...valores, ctasJson, actual.id]
       );
 
       if (habiaAprobadaAntes) {
@@ -141,8 +176,8 @@ router.post('/nueva-version', async (req, res, next) => {
       `INSERT INTO perfiles_producto
         (producto_id, version, estado, identidad, publico_objetivo, dolor_solucion,
          objetivo_crecimiento, tono_voz, frases_guia, ejemplos_referencia, ctas_por_etapa,
-         version_origen_id)
-       VALUES ($1, $2, 'borrador', $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+         ctas_estructurados, version_origen_id)
+       VALUES ($1, $2, 'borrador', $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
       [
         req.producto.id,
         nuevaVersion,
@@ -154,6 +189,7 @@ router.post('/nueva-version', async (req, res, next) => {
         actual.frases_guia,
         actual.ejemplos_referencia,
         actual.ctas_por_etapa,
+        actual.ctas_estructurados || '[]',
         actual.id,
       ]
     );
@@ -227,6 +263,7 @@ router.get('/version/:v', async (req, res, next) => {
       totalVersiones: versiones.length,
       puedeSeedTalent: false,
       hayPerfilAprobado: versiones.some((v) => v.estado === 'aprobado'),
+      ctasEstructurados: parseCtasGuardadas(rows[0]),
     });
   } catch (err) {
     next(err);

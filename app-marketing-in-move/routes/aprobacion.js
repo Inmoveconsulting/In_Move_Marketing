@@ -48,9 +48,30 @@ router.get('/', async (req, res, next) => {
       return new Date(a.creado_en) - new Date(b.creado_en);
     });
 
+    // "Ya procesadas" — checklist de lo aprobado, aparte de la cola de pendientes. La
+    // pieza sale de la cola en cuanto se aprueba, lo cual daba incertidumbre ("¿esto habrá
+    // corrido?"); esta lista es el registro real en la base (no algo de la sesión que se
+    // pierde al recargar) para poder confirmar de un vistazo qué quedó realmente aprobado.
+    const { rows: aprobadasContenido } = await pool.query(
+      `SELECT cg.*, 'contenido' AS origen
+       FROM contenido_generado cg
+       JOIN planes_marketing pm ON pm.id = cg.plan_marketing_id
+       WHERE pm.producto_id = $1 AND cg.estado = 'aprobado'`,
+      [req.producto.id]
+    );
+    const { rows: aprobadasLinkedin } = await pool.query(
+      `SELECT *, 'linkedin' AS origen FROM contenido_linkedin
+       WHERE producto_id = $1 AND estado = 'aprobado'`,
+      [req.producto.id]
+    );
+    const piezasAprobadas = [...aprobadasContenido, ...aprobadasLinkedin].sort(
+      (a, b) => new Date(b.actualizado_en) - new Date(a.actualizado_en)
+    );
+
     res.render('aprobacion/show', {
       producto: req.producto,
       piezas,
+      piezasAprobadas,
       error: req.query.error || null,
     });
   } catch (err) {

@@ -62,6 +62,47 @@
     </div>
   <% }); %>
 
+  <div class="field">
+    <label>CTAs con destino real (para publicación automática)</label>
+    <p class="field-help">
+      Cada CTA que uses arriba en "CTAs por etapa" debería tener acá su versión con el link,
+      WhatsApp, teléfono o email real al que apunta — así la futura Pantalla 5 (Metricool)
+      puede armar la publicación con el destino correcto en vez de solo la frase. El
+      "nombre" tiene que coincidir con cómo lo llamás arriba (ej: "Conoce el proceso") para
+      que se puedan emparejar automáticamente.
+    </p>
+
+    <% if (readonly) { %>
+      <% if (!ctasEstructurados || ctasEstructurados.length === 0) { %>
+        <div class="field-readonly">— sin CTAs estructurados cargados —</div>
+      <% } else { %>
+        <ul class="cta-lista-readonly">
+          <% ctasEstructurados.forEach(function (c) { %>
+            <li><strong><%= c.nombre %></strong> — <%= c.tipo %>: <%= c.destino %></li>
+          <% }); %>
+        </ul>
+      <% } %>
+    <% } else { %>
+      <div id="cta-filas">
+        <% const filas = (ctasEstructurados && ctasEstructurados.length > 0) ? ctasEstructurados : [{ nombre: '', tipo: 'link', destino: '' }]; %>
+        <% filas.forEach(function (c) { %>
+          <div class="cta-fila">
+            <input type="text" name="cta_nombre[]" value="<%= c.nombre %>" placeholder="Nombre del CTA (ej: Conoce el proceso)">
+            <select name="cta_tipo[]">
+              <option value="link" <%= c.tipo === 'link' ? 'selected' : '' %>>Link</option>
+              <option value="whatsapp" <%= c.tipo === 'whatsapp' ? 'selected' : '' %>>WhatsApp</option>
+              <option value="telefono" <%= c.tipo === 'telefono' ? 'selected' : '' %>>Teléfono</option>
+              <option value="email" <%= c.tipo === 'email' ? 'selected' : '' %>>Email</option>
+            </select>
+            <input type="text" name="cta_destino[]" value="<%= c.destino %>" placeholder="URL, número o dirección real">
+            <button type="button" class="btn-quitar-cta">Quitar</button>
+          </div>
+        <% }); %>
+      </div>
+      <button type="button" id="btn-agregar-cta">+ Agregar CTA</button>
+    <% } %>
+  </div>
+
   <% if (!readonly) { %>
     <div class="form-actions">
       <button type="submit">Guardar borrador</button>

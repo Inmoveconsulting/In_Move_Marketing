@@ -414,3 +414,69 @@ button.btn-primary {
   font-size: 0.8rem;
   padding: 24px;
 }
+
+/* Pantalla 4 — checklist de "Ya procesadas", separado de la cola de pendientes para que
+   quede claro qué se aprobó de verdad (registro real de la base, no algo de la sesión). */
+.aprobadas-checklist {
+  background: var(--aprobado-bg);
+  border: 1px solid var(--aprobado-text);
+  border-radius: 10px;
+  padding: 12px 16px;
+  margin: 20px 0;
+}
+
+.aprobadas-checklist summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--aprobado-text);
+}
+
+.aprobadas-checklist ul {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+}
+
+.aprobadas-checklist li {
+  padding: 4px 0;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.aprobadas-checklist li:first-child { border-top: none; }
+
+.check-verde {
+  color: var(--aprobado-text);
+  font-weight: 700;
+  margin-right: 4px;
+}
+
+/* Pantalla 1 — filas de "CTAs con destino real". */
+.cta-fila {
+  display: grid;
+  grid-template-columns: 1.3fr 0.8fr 1.3fr auto;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.cta-fila input[type="text"],
+.cta-fila select {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font: inherit;
+  background: var(--card-bg);
+  color: var(--text);
+}
+
+.cta-lista-readonly {
+  padding-left: 20px;
+  margin: 0;
+}
+
+@media (max-width: 560px) {
+  .cta-fila {
+    grid-template-columns: 1fr;
+  }
+}
