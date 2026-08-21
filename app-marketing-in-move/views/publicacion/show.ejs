@@ -43,7 +43,7 @@
 <% } else { %>
   <div class="piezas-grid">
     <% piezas.forEach(function (p) { %>
-      <div class="pieza-card">
+      <div class="pieza-card" id="pieza-<%= p.origen %>-<%= p.id %>">
         <span class="badge badge-vacio">
           <%= p.origen === 'linkedin' ? 'Artículo LinkedIn' : p.canalReal %>
         </span>

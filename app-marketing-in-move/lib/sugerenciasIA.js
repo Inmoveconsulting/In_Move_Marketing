@@ -169,7 +169,9 @@ ${
 Devolvé solo el texto final del copy, listo para publicar.
 `.trim();
 
-  const { text } = await askClaude({ system, prompt, maxTokens: 700 });
+  // Ver nota de maxTokens en sugerirTitularYBajada — subido de 700 a 1200 por el mismo
+  // motivo (perfiles más densos como el de Readiness).
+  const { text } = await askClaude({ system, prompt, maxTokens: 1200 });
   return text.trim();
 }
 
@@ -209,7 +211,11 @@ Respondé con este JSON exacto, sin nada más alrededor:
 {"titular": "<máximo 8 palabras>", "bajada": "<máximo 14 palabras, una sola oración>"}
 `.trim();
 
-  const { text, stopReason } = await askClaude({ system, prompt, maxTokens: 250 });
+  // Subido de 250 a 600: aunque titular+bajada es una salida corta, con perfiles densos
+  // (tono_voz/frases_guia largos, como el de Readiness) Claude necesita más margen antes
+  // de llegar al JSON final — mismo patrón de diagnóstico ya documentado (stop_reason:
+  // max_tokens no es un bug de lógica, es el límite muy justo).
+  const { text, stopReason } = await askClaude({ system, prompt, maxTokens: 600 });
   const resultado = extractJson(text, { stopReason });
   return {
     titular: (resultado.titular || '').trim().replace(/^["']|["']$/g, ''),

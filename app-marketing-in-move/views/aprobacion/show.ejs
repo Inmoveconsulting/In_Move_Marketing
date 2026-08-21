@@ -43,7 +43,7 @@
 <% } else { %>
   <div class="piezas-grid">
     <% piezas.forEach(function (p) { %>
-      <div class="pieza-card">
+      <div class="pieza-card" id="pieza-<%= p.origen %>-<%= p.id %>">
         <% if (p.estado === 'a_revisar') { %>
           <span class="badge badge-borrador">A revisar — el perfil cambió desde que se generó</span>
         <% } %>

@@ -254,7 +254,11 @@ router.post('/pieza/:origen/:id/programar', async (req, res, next) => {
       [JSON.stringify(resultado).slice(0, 500), pieza.id]
     );
 
-    res.redirect(`/productos/${req.producto.slug}/publicacion`);
+    // Ver nota igual en aprobacion.js/contenido.js — evita que la recarga vuelva arriba
+    // del todo. Acá la pieza sale de "pendientes" al programarse, así que el ancla puede
+    // no encontrar nada si ya no está en esa lista — no rompe nada, simplemente no
+    // desplaza (se comporta como antes en ese caso puntual).
+    res.redirect(`/productos/${req.producto.slug}/publicacion#pieza-${origen}-${id}`);
   } catch (err) {
     res.redirect(
       `/productos/${req.producto.slug}/publicacion?error=${encodeURIComponent('No se pudo programar en Metricool: ' + err.message)}`

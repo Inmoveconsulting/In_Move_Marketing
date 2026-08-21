@@ -339,7 +339,10 @@ router.post('/pieza/:id/copy', async (req, res, next) => {
       'UPDATE contenido_generado SET copy = $1, actualizado_en = now() WHERE id = $2',
       [(req.body.copy || '').trim(), req.params.id]
     );
-    res.redirect(`/productos/${req.producto.slug}/contenido`);
+    // #pieza-<id> al final: sin esto, cada guardado/regeneración recargaba la página y
+    // volvía arriba del todo — en una semana con varias piezas, tocar una al fondo te
+    // hacía perder el lugar. El ancla hace que vuelva justo a la tarjeta que tocaste.
+    res.redirect(`/productos/${req.producto.slug}/contenido#pieza-${req.params.id}`);
   } catch (err) {
     next(err);
   }
@@ -374,7 +377,7 @@ router.post('/pieza/:id/regenerar', async (req, res, next) => {
       'UPDATE contenido_generado SET copy = $1, actualizado_en = now() WHERE id = $2',
       [nuevoCopy, pieza.id]
     );
-    res.redirect(`/productos/${req.producto.slug}/contenido`);
+    res.redirect(`/productos/${req.producto.slug}/contenido#pieza-${pieza.id}`);
   } catch (err) {
     res.redirect(
       `/productos/${req.producto.slug}/contenido?error=${encodeURIComponent('No se pudo regenerar la pieza: ' + err.message)}`
@@ -422,7 +425,7 @@ router.post('/pieza/:id/imagen-ia', async (req, res, next) => {
        WHERE id = $4`,
       [imagen, titular, bajada, pieza.id]
     );
-    res.redirect(`/productos/${req.producto.slug}/contenido`);
+    res.redirect(`/productos/${req.producto.slug}/contenido#pieza-${pieza.id}`);
   } catch (err) {
     res.redirect(
       `/productos/${req.producto.slug}/contenido?error=${encodeURIComponent('No se pudo crear la imagen: ' + err.message)}`
@@ -440,7 +443,7 @@ router.post('/pieza/:id/imagen', upload.single('imagen'), async (req, res, next)
         [dataUri, req.params.id]
       );
     }
-    res.redirect(`/productos/${req.producto.slug}/contenido`);
+    res.redirect(`/productos/${req.producto.slug}/contenido#pieza-${req.params.id}`);
   } catch (err) {
     res.redirect(
       `/productos/${req.producto.slug}/contenido?error=${encodeURIComponent(err.message)}`

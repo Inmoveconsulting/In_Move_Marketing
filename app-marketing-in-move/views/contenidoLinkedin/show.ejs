@@ -80,7 +80,7 @@
     <h2 class="section-title">Piezas generadas</h2>
     <div class="piezas-grid">
       <% piezas.forEach(function (p) { %>
-        <div class="pieza-card">
+        <div class="pieza-card" id="pieza-<%= p.id %>">
           <span class="badge badge-vacio"><%= p.tipo === 'mensaje' ? 'Mensaje directo' : 'Artículo' %></span>
           <p class="muted small"><%= p.tema %></p>
           <% if (p.contexto) { %><p class="muted small"><%= p.contexto %></p><% } %>

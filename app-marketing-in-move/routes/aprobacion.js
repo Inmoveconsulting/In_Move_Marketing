@@ -86,7 +86,11 @@ router.post('/pieza/:origen/:id/aprobar', async (req, res, next) => {
       `UPDATE ${tabla} SET estado = 'aprobado', actualizado_en = now() WHERE id = $1`,
       [req.params.id]
     );
-    res.redirect(`/productos/${req.producto.slug}/aprobacion`);
+    // #pieza-<origen>-<id>: sin esto la página volvía arriba del todo al recargar — con
+    // varias piezas en cola, aprobar una al fondo hacía perder el lugar y había que
+    // volver a bajar. El "aprobada" en sí sigue viéndose en el checklist de arriba, esto
+    // es solo para las que quedan pendientes debajo.
+    res.redirect(`/productos/${req.producto.slug}/aprobacion#pieza-${req.params.origen}-${req.params.id}`);
   } catch (err) {
     next(err);
   }
@@ -99,7 +103,7 @@ router.post('/pieza/:origen/:id/rechazar', async (req, res, next) => {
       `UPDATE ${tabla} SET estado = 'rechazado', actualizado_en = now() WHERE id = $1`,
       [req.params.id]
     );
-    res.redirect(`/productos/${req.producto.slug}/aprobacion`);
+    res.redirect(`/productos/${req.producto.slug}/aprobacion#pieza-${req.params.origen}-${req.params.id}`);
   } catch (err) {
     next(err);
   }
@@ -168,7 +172,7 @@ router.post('/pieza/:origen/:id/pedir-cambios', async (req, res, next) => {
       );
     }
 
-    res.redirect(`/productos/${req.producto.slug}/aprobacion`);
+    res.redirect(`/productos/${req.producto.slug}/aprobacion#pieza-${origen}-${id}`);
   } catch (err) {
     res.redirect(
       `/productos/${req.producto.slug}/aprobacion?error=${encodeURIComponent('No se pudo regenerar con ese feedback: ' + err.message)}`
