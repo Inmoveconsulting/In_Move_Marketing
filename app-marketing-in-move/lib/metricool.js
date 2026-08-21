@@ -46,10 +46,17 @@ async function normalizarImagen(urlImagen) {
   if (!res.ok) {
     throw new Error(`Metricool no pudo normalizar la imagen (status ${res.status}): ${bodyText.slice(0, 400)}`);
   }
+  // Primer intento real (21-ago-2026): Metricool no devolvió JSON acá, devolvió la URL
+  // normalizada como texto plano. Se admiten las dos formas en vez de asumir una — si en
+  // el futuro empieza a devolver JSON (objeto con mediaId/url), sigue funcionando igual.
   try {
     return JSON.parse(bodyText);
   } catch (err) {
-    throw new Error(`Metricool devolvió una respuesta inesperada al normalizar la imagen: ${bodyText.slice(0, 400)}`);
+    const texto = bodyText.trim();
+    if (!texto) {
+      throw new Error('Metricool devolvió una respuesta vacía al normalizar la imagen.');
+    }
+    return { url: texto };
   }
 }
 
@@ -65,7 +72,13 @@ async function programarPost({ texto, fechaHoraIso, timezone, providers, imagene
     autoPublish: true,
   };
   if (imagenes && imagenes.length > 0) {
-    body.media = imagenes;
+    // Acepta tanto {url: "..."} (nuestro fallback de texto plano) como un objeto JSON con
+    // mediaId/url si Metricool empieza a devolver eso — nunca manda el objeto crudo sin
+    // resolver a una URL/id usable.
+    body.media = imagenes.map((img) => {
+      if (typeof img === 'string') return img;
+      return img.url || img.mediaUrl || img.mediaId || img.id || img;
+    });
   }
 
   const url = `${BASE}/v2/scheduler/posts?userId=${userId}&blogId=${blogId}`;

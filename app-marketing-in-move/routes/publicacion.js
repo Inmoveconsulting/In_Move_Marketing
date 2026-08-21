@@ -11,6 +11,39 @@ const { normalizarImagen, programarPost } = require('../lib/metricool');
 // MVP — nunca se automatiza su envío, ver routes/contenidoLinkedin.js).
 const CANALES_NO_METRICOOL = ['Email'];
 
+const DIAS_SEMANA = {
+  domingo: 0, lunes: 1, martes: 2, miércoles: 3, miercoles: 3, jueves: 4,
+  viernes: 5, sábado: 6, sabado: 6,
+};
+
+// Lunes de la semana actual (o de hoy si hoy es lunes) — punto de partida para "semana 1"
+// del plan. Asume que la publicación arranca esta semana, no la fecha en que se aprobó el
+// plan — tiene más sentido para cuando se lanza bastante después de armar el contenido.
+function lunesDeEstaSemana() {
+  const hoy = new Date();
+  const diasDesdeElLunes = (hoy.getDay() + 6) % 7; // domingo=0 -> 6, lunes=1 -> 0, ...
+  const lunes = new Date(hoy);
+  lunes.setDate(hoy.getDate() - diasDesdeElLunes);
+  lunes.setHours(0, 0, 0, 0);
+  return lunes;
+}
+
+// Sugiere una fecha (YYYY-MM-DD) para una pieza según su semana + el primer día que tenga
+// configurado su canal en el plan (ej "lunes, martes, miércoles, jueves" -> lunes). No
+// distribuye varias piezas del mismo canal/semana en días distintos entre sí — todas
+// sugieren el mismo primer día, hay que separarlas a mano. Es un punto de partida, no
+// reemplaza el criterio de quien programa.
+function sugerirFecha(semana, diasTexto, lunesBase) {
+  if (!semana || !diasTexto) return '';
+  const primerDia = String(diasTexto).split(',')[0].trim().toLowerCase();
+  const indiceLunes1 = DIAS_SEMANA[primerDia];
+  if (indiceLunes1 === undefined) return '';
+  const offsetDesdeLunes = indiceLunes1 === 0 ? 6 : indiceLunes1 - 1; // lunes=0, domingo=6
+  const fecha = new Date(lunesBase);
+  fecha.setDate(fecha.getDate() + (semana - 1) * 7 + offsetDesdeLunes);
+  return fecha.toISOString().slice(0, 10);
+}
+
 router.use(async (req, res, next) => {
   try {
     const producto = await getProducto(req.params.slug);
@@ -46,7 +79,7 @@ router.get('/imagen/:origen/:id.png', async (req, res, next) => {
 router.get('/', async (req, res, next) => {
   try {
     const { rows: piezasContenido } = await pool.query(
-      `SELECT cg.*, 'contenido' AS origen
+      `SELECT cg.*, pm.canales AS plan_canales, 'contenido' AS origen
        FROM contenido_generado cg
        JOIN planes_marketing pm ON pm.id = cg.plan_marketing_id
        WHERE pm.producto_id = $1 AND cg.estado = 'aprobado'
@@ -59,10 +92,15 @@ router.get('/', async (req, res, next) => {
        ORDER BY creado_en ASC`,
       [req.producto.id]
     );
-    const piezas = [...piezasContenido, ...piezasLinkedin].map((p) => ({
-      ...p,
-      canalReal: p.origen === 'linkedin' ? 'LinkedIn' : p.canal,
-    }));
+    const lunesBase = lunesDeEstaSemana();
+    const piezas = [...piezasContenido, ...piezasLinkedin].map((p) => {
+      const canalReal = p.origen === 'linkedin' ? 'LinkedIn' : p.canal;
+      const canalPlan = (p.plan_canales || []).find((c) => c.canal === canalReal);
+      const fechaSugerida = p.origen === 'contenido'
+        ? sugerirFecha(p.semana, canalPlan && canalPlan.dias, lunesBase)
+        : '';
+      return { ...p, canalReal, fechaSugerida };
+    });
 
     const { rows: programadasContenido } = await pool.query(
       `SELECT cg.*, 'contenido' AS origen

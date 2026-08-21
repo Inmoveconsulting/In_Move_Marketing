@@ -63,10 +63,13 @@
           <p class="muted small">⚠ Pendiente manual — este canal no lo programa Metricool.</p>
         <% } else { %>
           <form method="POST" action="/productos/<%= producto.slug %>/publicacion/pieza/<%= p.origen %>/<%= p.id %>/programar" class="cta-fila" style="grid-template-columns:1fr 1fr auto;">
-            <input type="date" name="fecha" required>
+            <input type="date" name="fecha" value="<%= p.fechaSugerida || '' %>" required>
             <input type="time" name="hora" value="09:00" required>
             <button type="submit" class="btn-primary">Programar</button>
           </form>
+          <% if (p.fechaSugerida) { %>
+            <p class="muted small">Sugerida según el plan — revisá si hay más piezas del mismo canal esta semana, puede que coincidan en el día.</p>
+          <% } %>
         <% } %>
       </div>
     <% }); %>
