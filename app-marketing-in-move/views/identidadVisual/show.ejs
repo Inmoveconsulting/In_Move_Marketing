@@ -81,7 +81,7 @@
           pieza. Podés modificarlo agregando o quitando instrucciones — por ejemplo mood
           (alegre, formal), colores de marca, qué evitar.
         </p>
-        <textarea id="prompt_imagen" name="prompt_imagen" rows="8"><%= (iv && iv.prompt_imagen) || '' %></textarea>
+        <textarea id="prompt_imagen" name="prompt_imagen" rows="8"><%= (iv && iv.prompt_imagen) || promptSugerido || '' %></textarea>
       </div>
 
       <div class="form-actions">

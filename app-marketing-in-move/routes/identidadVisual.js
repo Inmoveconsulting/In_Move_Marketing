@@ -47,9 +47,12 @@ async function archivoADataUri(file) {
   }
 }
 
-// Prompt de base por defecto — sin llamar a la IA, así el campo nunca arranca vacío. Ya
-// incluye las reglas anti-cliché aprendidas en la práctica (evitar el look de foto stock
-// corporativa genérica). Se genera una sola vez; si ya hay un prompt guardado no se pisa.
+// Prompt de base por defecto — sin llamar a la IA, así el campo nunca arranca vacío (ni
+// siquiera antes del primer guardado, ver GET /). Ya incluye las reglas aprendidas en la
+// práctica: anti-cliché de foto stock corporativa, y las dos reglas duras que se agregaron
+// después de bugs reales (texto/números garabateados en el fondo — ver README/memoria — y
+// que use como guía los colores del logo/referencias, no colores genéricos al azar). Se
+// genera una sola vez; si ya hay un prompt guardado no se pisa.
 function promptBase(perfil) {
   return `
 Fotografía para contenido de marketing B2B de esta marca.
@@ -59,6 +62,15 @@ Tono de marca: ${perfil.tono_voz}
 Evitá la estética de foto stock genérica de "reunión corporativa" (gente sonriendo
 mirando a cámara, poses artificiales). Buscá un momento natural de trabajo real: alguien
 mirando una pantalla con datos, señalando algo concreto en un documento o dashboard.
+
+No incluyas texto ni números en ningún lugar de la imagen, ni siquiera de fondo o en
+pantallas/documentos que aparezcan — nada de letras, palabras, cifras ni interfaces con
+texto legible. Si aparece una pantalla o documento, que se vea con iconografía o gráficos
+abstractos, nunca con texto simulado.
+
+Usá como guía de paleta de colores el logo y las imágenes de referencia que se suban en
+esta misma pantalla — que los colores dominantes de la foto (ropa, objetos, luz ambiente)
+acompañen esa paleta, sin que la imagen se sienta genérica o desconectada de la marca.
 
 Dejá una zona de fondo liso o de bajo contraste en la parte superior, para poder
 superponer un título después — no la llenes de detalle. Formato cuadrado, alta calidad.
@@ -82,10 +94,16 @@ router.get('/', async (req, res, next) => {
     const versiones = await getIdentidadVisualVersiones(req.producto.id);
     const actual = versiones[0] || null;
 
+    // Antes esto quedaba vacío hasta el primer "Guardar" (el autocompletado solo pasaba
+    // en el POST) — ahora se precarga ya en la primera visita a la pantalla, sin
+    // necesitar guardar antes para verlo.
+    const promptSugerido = !actual && perfilAprobado ? promptBase(perfilAprobado) : '';
+
     res.render('identidadVisual/show', {
       producto: req.producto,
       perfilAprobado,
       iv: actual,
+      promptSugerido,
       readonly: actual ? actual.estado === 'aprobado' : false,
       esNuevo: !actual,
       esHistorico: false,
@@ -242,6 +260,7 @@ router.get('/version/:v', async (req, res, next) => {
       producto: req.producto,
       perfilAprobado,
       iv: rows[0],
+      promptSugerido: '',
       readonly: true,
       esNuevo: false,
       esHistorico: rows[0].version !== versiones[0].version,
