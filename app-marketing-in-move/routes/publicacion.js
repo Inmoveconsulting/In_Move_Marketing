@@ -33,6 +33,11 @@ function lunesDeEstaSemana() {
 // distribuye varias piezas del mismo canal/semana en días distintos entre sí — todas
 // sugieren el mismo primer día, hay que separarlas a mano. Es un punto de partida, no
 // reemplaza el criterio de quien programa.
+//
+// Si el día calculado ya pasó (o es hoy pero ya es más tarde que la hora por defecto,
+// 09:00), lo empuja a la semana siguiente — Metricool rechaza con error 400 cualquier
+// fecha/hora en el pasado, así que sugerir un día ya pasado rompe el flujo en vez de
+// ayudar.
 function sugerirFecha(semana, diasTexto, lunesBase) {
   if (!semana || !diasTexto) return '';
   const primerDia = String(diasTexto).split(',')[0].trim().toLowerCase();
@@ -41,6 +46,15 @@ function sugerirFecha(semana, diasTexto, lunesBase) {
   const offsetDesdeLunes = indiceLunes1 === 0 ? 6 : indiceLunes1 - 1; // lunes=0, domingo=6
   const fecha = new Date(lunesBase);
   fecha.setDate(fecha.getDate() + (semana - 1) * 7 + offsetDesdeLunes);
+
+  const fechaHoraSugerida = new Date(fecha);
+  fechaHoraSugerida.setHours(9, 0, 0, 0); // misma hora por defecto que precarga el formulario
+  const margen = new Date();
+  margen.setMinutes(margen.getMinutes() + 15); // colchón chico para el tiempo que tarda en tocar "Programar"
+  if (fechaHoraSugerida <= margen) {
+    fecha.setDate(fecha.getDate() + 7);
+  }
+
   return fecha.toISOString().slice(0, 10);
 }
 
