@@ -48,7 +48,8 @@ oraciones cortas, no más) para que la respuesta no se corte:
 {"duracion_dias": <número entero>, "razon": "<2 a 3 oraciones breves explicando por qué>"}
 `.trim();
 
-  const { text, stopReason } = await askClaude({ system: SYSTEM, prompt, maxTokens: 600 });
+  // Ver nota de maxTokens en sugerirCanales — mismo motivo, subido de 600 a 900.
+  const { text, stopReason } = await askClaude({ system: SYSTEM, prompt, maxTokens: 900 });
   return extractJson(text, { stopReason });
 }
 
@@ -80,7 +81,11 @@ oraciones cortas, no más) para que la respuesta no se corte, y no agregues camp
 }
 `.trim();
 
-  const { text, stopReason } = await askClaude({ system: SYSTEM, prompt, maxTokens: 1000 });
+  // maxTokens subido de 1000 a 1600: con perfiles de producto más densos (ej. Readiness,
+  // con más texto en cada campo que el de Talent), el resumen que se le manda a Claude es
+  // más largo y la respuesta se puede cortar a mitad de camino con stop_reason:
+  // max_tokens — mismo patron de diagnostico documentado en askClaude/extractJson.
+  const { text, stopReason } = await askClaude({ system: SYSTEM, prompt, maxTokens: 1600 });
   return extractJson(text, { stopReason });
 }
 
@@ -115,7 +120,8 @@ oraciones cortas, no más) para que la respuesta no se corte, y no agregues camp
 }
 `.trim();
 
-  const { text, stopReason } = await askClaude({ system: SYSTEM, prompt, maxTokens: 1300 });
+  // Ver nota de maxTokens en sugerirCanales — mismo motivo, subido de 1300 a 1900.
+  const { text, stopReason } = await askClaude({ system: SYSTEM, prompt, maxTokens: 1900 });
   return extractJson(text, { stopReason });
 }
 

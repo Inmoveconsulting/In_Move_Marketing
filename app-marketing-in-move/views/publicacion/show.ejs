@@ -55,6 +55,14 @@
 
         <div class="field-readonly"><%= p.copy %></div>
 
+        <% if (p.origen === 'contenido') { %>
+          <% if (p.linkCta) { %>
+            <p class="muted small">🔗 Se agrega al final al programar: <%= p.linkCta %></p>
+          <% } else { %>
+            <p class="muted small">Sin link de CTA para esta pieza (el pilar no tiene CTA, o falta cargar el destino real en el Perfil).</p>
+          <% } %>
+        <% } %>
+
         <% if (p.imagen_ref) { %>
           <img class="identidad-thumb" src="<%= p.imagen_ref %>" alt="Imagen de la pieza">
         <% } %>

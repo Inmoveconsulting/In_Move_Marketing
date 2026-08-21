@@ -107,14 +107,38 @@ router.get('/', async (req, res, next) => {
       [req.producto.id]
     );
     const lunesBase = lunesDeEstaSemana();
-    const piezas = [...piezasContenido, ...piezasLinkedin].map((p) => {
-      const canalReal = p.origen === 'linkedin' ? 'LinkedIn' : p.canal;
-      const canalPlan = (p.plan_canales || []).find((c) => c.canal === canalReal);
-      const fechaSugerida = p.origen === 'contenido'
-        ? sugerirFecha(p.semana, canalPlan && canalPlan.dias, lunesBase)
-        : '';
-      return { ...p, canalReal, fechaSugerida };
+
+    // Agrupa las piezas de contenido por semana+canal para poder repartir los días
+    // configurados entre ellas (ej: 4 piezas de LinkedIn en la semana 1 -> lunes, martes,
+    // miércoles, jueves, una por una) en vez de que todas caigan en el mismo día — eso
+    // pasaba antes de este cambio, se apilaban todas el primer día de la lista.
+    const gruposPorSemanaCanal = {};
+    piezasContenido.forEach((p) => {
+      const key = `${p.semana}|${p.canal}`;
+      (gruposPorSemanaCanal[key] = gruposPorSemanaCanal[key] || []).push(p);
     });
+    Object.values(gruposPorSemanaCanal).forEach((grupo) => grupo.sort((a, b) => a.id - b.id));
+
+    const piezas = [];
+    for (const p of [...piezasContenido, ...piezasLinkedin]) {
+      const canalReal = p.origen === 'linkedin' ? 'LinkedIn' : p.canal;
+      let fechaSugerida = '';
+      let linkCta = null;
+      if (p.origen === 'contenido') {
+        const canalPlan = (p.plan_canales || []).find((c) => c.canal === canalReal);
+        const dias = canalPlan
+          ? String(canalPlan.dias || '').split(',').map((d) => d.trim()).filter(Boolean)
+          : [];
+        const grupo = gruposPorSemanaCanal[`${p.semana}|${p.canal}`] || [p];
+        const posicion = grupo.findIndex((x) => x.id === p.id);
+        // si hay más piezas que días configurados, rota (ej: 5 piezas, 4 días -> la 5ta
+        // vuelve a caer en el 1er día) en vez de dejar la sugerencia vacía.
+        const diaElegido = dias.length > 0 ? dias[posicion % dias.length] : '';
+        fechaSugerida = sugerirFecha(p.semana, diaElegido, lunesBase);
+        linkCta = await resolverLinkCta(p);
+      }
+      piezas.push({ ...p, canalReal, fechaSugerida, linkCta });
+    }
 
     const { rows: programadasContenido } = await pool.query(
       `SELECT cg.*, 'contenido' AS origen
@@ -143,6 +167,35 @@ router.get('/', async (req, res, next) => {
     next(err);
   }
 });
+
+// Resuelve el link real del CTA de una pieza de Contenido (no aplica a LinkedIn
+// "articulo", que no está atado a un plan/pilar todavía — ver nota en README). Cadena:
+// pieza.pilar -> plan.calendario[].cta (nombre del CTA, ej "Evaluemos tu próxima
+// contratación") -> perfil.ctas_estructurados[].destino (URL real, cargada en la
+// Pantalla 1). Si algún eslabón no matchea (CTA sin estructurar, nombre que no coincide
+// exacto, etc.) devuelve null — el copy se manda igual, solo sin el link.
+async function resolverLinkCta(pieza) {
+  if (!pieza.plan_marketing_id || !pieza.pilar) return null;
+  const { rows: planRows } = await pool.query('SELECT calendario FROM planes_marketing WHERE id = $1', [
+    pieza.plan_marketing_id,
+  ]);
+  const calendario = (planRows[0] && planRows[0].calendario) || [];
+  const pilarInfo = calendario.find((c) => c.pilar === pieza.pilar);
+  const nombreCta = pilarInfo && pilarInfo.cta;
+  if (!nombreCta || nombreCta === 'sin CTA duro') return null;
+
+  const { rows: perfilRows } = await pool.query('SELECT ctas_estructurados FROM perfiles_producto WHERE id = $1', [
+    pieza.perfil_producto_id,
+  ]);
+  let ctas = [];
+  try {
+    ctas = JSON.parse((perfilRows[0] && perfilRows[0].ctas_estructurados) || '[]');
+  } catch (err) {
+    ctas = [];
+  }
+  const cta = ctas.find((c) => c.nombre === nombreCta);
+  return (cta && cta.destino) || null;
+}
 
 router.post('/pieza/:origen/:id/programar', async (req, res, next) => {
   const { origen, id } = req.params;
@@ -177,8 +230,19 @@ router.post('/pieza/:origen/:id/programar', async (req, res, next) => {
       imagenes = [normalizada];
     }
 
+    // Suma el link real del CTA al final del copy, si se puede resolver (ver
+    // resolverLinkCta) — antes esto no pasaba nunca, el copy se mandaba tal cual salía de
+    // la IA sin el destino real del CTA.
+    let texto = pieza.copy;
+    if (origen !== 'linkedin') {
+      const linkCta = await resolverLinkCta(pieza);
+      if (linkCta) {
+        texto = `${pieza.copy}\n\n${linkCta}`;
+      }
+    }
+
     const resultado = await programarPost({
-      texto: pieza.copy,
+      texto,
       fechaHoraIso,
       providers: [{ network: canal.toLowerCase() }],
       imagenes,
