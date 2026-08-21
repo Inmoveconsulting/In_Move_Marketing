@@ -19,6 +19,12 @@ services:
         sync: false
       - key: OPENAI_API_KEY
         sync: false
+      - key: METRICOOL_TOKEN
+        sync: false
+      - key: METRICOOL_USER_ID
+        sync: false
+      - key: METRICOOL_BLOG_ID
+        sync: false
 
 databases:
   - name: in-move-marketing-db

@@ -12,6 +12,7 @@ const identidadVisualRouter = require('./routes/identidadVisual');
 const contenidoRouter = require('./routes/contenido');
 const contenidoLinkedinRouter = require('./routes/contenidoLinkedin');
 const aprobacionRouter = require('./routes/aprobacion');
+const publicacionRouter = require('./routes/publicacion');
 
 const app = express();
 
@@ -38,6 +39,7 @@ app.use('/productos/:slug/identidad-visual', identidadVisualRouter);
 app.use('/productos/:slug/contenido', contenidoRouter);
 app.use('/productos/:slug/linkedin', contenidoLinkedinRouter);
 app.use('/productos/:slug/aprobacion', aprobacionRouter);
+app.use('/productos/:slug/publicacion', publicacionRouter);
 
 app.use((req, res) => {
   res.status(404).send('No encontrado.');

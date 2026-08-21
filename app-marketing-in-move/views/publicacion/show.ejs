@@ -1,0 +1,76 @@
+<%- include('../partials/header') %>
+
+<div class="perfil-header">
+  <div>
+    <h1>Publicación</h1>
+    <span class="muted small"><%= piezas.length %> pieza(s) aprobada(s) por programar</span>
+  </div>
+</div>
+
+<% if (error) { %>
+  <p class="callout callout-error"><%= error %></p>
+<% } %>
+
+<p class="field-help">
+  Piezas ya aprobadas en la Cola de aprobación, listas para programar en redes vía
+  Metricool. Elegí fecha y hora por pieza y tocá "Programar". Los canales que Metricool no
+  soporta (Email, mensajes directos de LinkedIn) quedan marcados como pendiente manual —
+  no se intenta automatizar su envío.
+</p>
+
+<% if (programadas.length > 0) { %>
+  <details class="aprobadas-checklist" open>
+    <summary>✓ Ya programadas (<%= programadas.length %>)</summary>
+    <ul>
+      <% programadas.forEach(function (p) { %>
+        <li>
+          <span class="check-verde">✓</span>
+          <%= p.canalReal %>
+          <% if (p.origen === 'contenido') { %>
+            · Semana <%= p.semana %> · <%= p.pilar %>
+          <% } else { %>
+            · <%= p.tema %>
+          <% } %>
+          <span class="muted small">— programada <%= new Date(p.programado_en).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) %></span>
+        </li>
+      <% }); %>
+    </ul>
+  </details>
+<% } %>
+
+<% if (piezas.length === 0) { %>
+  <p class="callout">No hay piezas aprobadas pendientes de programar ahora mismo.</p>
+<% } else { %>
+  <div class="piezas-grid">
+    <% piezas.forEach(function (p) { %>
+      <div class="pieza-card">
+        <span class="badge badge-vacio">
+          <%= p.origen === 'linkedin' ? 'Artículo LinkedIn' : p.canalReal %>
+        </span>
+        <% if (p.origen === 'contenido') { %>
+          <p class="muted small">Semana <%= p.semana %> · <%= p.pilar %></p>
+        <% } else { %>
+          <p class="muted small"><%= p.tema %></p>
+        <% } %>
+
+        <div class="field-readonly"><%= p.copy %></div>
+
+        <% if (p.imagen_ref) { %>
+          <img class="identidad-thumb" src="<%= p.imagen_ref %>" alt="Imagen de la pieza">
+        <% } %>
+
+        <% if (canalesNoMetricool.includes(p.canalReal)) { %>
+          <p class="muted small">⚠ Pendiente manual — este canal no lo programa Metricool.</p>
+        <% } else { %>
+          <form method="POST" action="/productos/<%= producto.slug %>/publicacion/pieza/<%= p.origen %>/<%= p.id %>/programar" class="cta-fila" style="grid-template-columns:1fr 1fr auto;">
+            <input type="date" name="fecha" required>
+            <input type="time" name="hora" value="09:00" required>
+            <button type="submit" class="btn-primary">Programar</button>
+          </form>
+        <% } %>
+      </div>
+    <% }); %>
+  </div>
+<% } %>
+
+<%- include('../partials/footer') %>

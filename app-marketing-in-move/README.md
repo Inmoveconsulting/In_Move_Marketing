@@ -274,6 +274,24 @@ imágenes" no va a andar.
    antes, no hace falta hacer nada).
 5. Guardá — redespliega solo.
 
+### API key de Metricool (necesaria para programar en redes en la Pantalla 5)
+
+La Pantalla de Publicación usa la API de Metricool para programar los posteos ya aprobados.
+Requiere un plan Metricool **Advanced o superior** — en planes más chicos no aparece la
+sección de API.
+
+1. En Metricool, con el plan correcto activo, andá a **Configuración → API** y generá el
+   token.
+2. Necesitás además tu `userId` y el `blogId` (identificador de la marca dentro de tu
+   cuenta) — Metricool los muestra en esa misma pantalla o en la URL cuando estás
+   trabajando dentro de la marca.
+3. En Render, entrá al servicio `in-move-marketing` → pestaña **Environment**.
+4. Agregá las 3 variables: `METRICOOL_TOKEN`, `METRICOOL_USER_ID`, `METRICOOL_BLOG_ID`.
+5. Guardá — redespliega solo.
+
+Sin esto, todo lo demás funciona igual — la Pantalla de Publicación va a mostrar un error
+claro ("Faltan configurar METRICOOL_TOKEN...") solo al tocar "Programar", nada más se rompe.
+
 ## Cómo actualizar la app en el futuro (mismo mecanismo que ya usás)
 
 Cuando te dé archivos nuevos o modificados:
@@ -387,7 +405,30 @@ Cuando te dé archivos nuevos o modificados:
    cambió desde que se generó" (y salir del checklist de aprobadas, porque ya no está en
    `aprobado`).
 
+## Cómo probar la Publicación con datos reales
+
+1. Con al menos una pieza aprobada en la Cola de aprobación (Pantalla 4), tocá
+   **"Publicación"** en el menú de arriba.
+2. Vas a ver las piezas aprobadas de canales que Metricool soporta, cada una con un
+   selector de fecha/hora y un botón **"Programar"**. Las de Email (si hay) aparecen con
+   el aviso "Pendiente manual" en vez del botón — Metricool no programa email marketing.
+3. Elegí fecha y hora, tocá **"Programar"**. Si las 3 variables de Metricool están bien
+   cargadas, la pieza pasa a estado `programado` y aparece arriba en el checklist
+   **"✓ Ya programadas"** (mismo patrón que el de la Cola de aprobación).
+4. **Si algo falla la primera vez, es esperable** — la forma exacta que espera la API de
+   Metricool para el array `providers` y la respuesta de `normalize/image/url` no estaba
+   100% documentada al escribir esto. El error que muestra la pantalla incluye la
+   respuesta cruda de Metricool — copiala y pasámela para ajustar el parseo en
+   `lib/metricool.js`, no hace falta adivinar.
+5. Las piezas de canal Email, y los "mensaje" directos de LinkedIn (1 a 1), nunca aparecen
+   acá para programar — quedan siempre para enviar a mano, es una decisión de alcance, no
+   una limitación técnica.
+
 ## Qué sigue (no construido todavía)
 
-Publicación vía Metricool (Pantalla 5) y medición con recomendación de próximo plan
-(Pantalla 6).
+Medición con recomendación de próximo plan (Pantalla 6). También falta, dentro de
+Publicación: marcar `publicado` cuando el posteo efectivamente sale (hoy solo se registra
+`programado` al mandarlo a Metricool) y estructurar los CTAs por producto — ya está la
+sección "CTAs con destino real" en el Perfil (Pantalla 1), pero el copy generado por IA
+todavía no inserta ese link automáticamente en el texto, solo queda disponible como dato
+para cuando se arme el posteo real.

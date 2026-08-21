@@ -137,6 +137,8 @@ CREATE TABLE IF NOT EXISTS contenido_generado (
   imagen_ref TEXT,
   estado TEXT NOT NULL DEFAULT 'borrador', -- borrador | a_revisar | aprobado | rechazado | programado | publicado
   feedback TEXT,
+  programado_en TIMESTAMPTZ,
+  metricool_post_id TEXT,
   version_origen_id INTEGER REFERENCES contenido_generado(id),
   creado_en TIMESTAMPTZ NOT NULL DEFAULT now(),
   actualizado_en TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -146,6 +148,8 @@ CREATE TABLE IF NOT EXISTS contenido_generado (
 ALTER TABLE contenido_generado ADD COLUMN IF NOT EXISTS semana INTEGER;
 ALTER TABLE contenido_generado ADD COLUMN IF NOT EXISTS texto_imagen TEXT DEFAULT '';
 ALTER TABLE contenido_generado ADD COLUMN IF NOT EXISTS bajada_imagen TEXT DEFAULT '';
+ALTER TABLE contenido_generado ADD COLUMN IF NOT EXISTS programado_en TIMESTAMPTZ;
+ALTER TABLE contenido_generado ADD COLUMN IF NOT EXISTS metricool_post_id TEXT;
 
 -- contenido_linkedin: Pantalla 3b. Mensajes directos (1 a 1, sin imagen) y artículos/posts
 -- de LinkedIn (con imagen, mismo mecanismo que contenido_generado) para prospección
@@ -164,8 +168,10 @@ CREATE TABLE IF NOT EXISTS contenido_linkedin (
   texto_imagen TEXT DEFAULT '',
   bajada_imagen TEXT DEFAULT '',
   imagen_ref TEXT,
-  estado TEXT NOT NULL DEFAULT 'borrador', -- borrador | a_revisar | aprobado | rechazado
+  estado TEXT NOT NULL DEFAULT 'borrador', -- borrador | a_revisar | aprobado | rechazado | programado | publicado
   feedback TEXT,
+  programado_en TIMESTAMPTZ,
+  metricool_post_id TEXT,
   version_origen_id INTEGER REFERENCES contenido_linkedin(id),
   creado_en TIMESTAMPTZ NOT NULL DEFAULT now(),
   actualizado_en TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -173,6 +179,8 @@ CREATE TABLE IF NOT EXISTS contenido_linkedin (
 
 -- Por si la tabla ya existia de un deploy anterior a que se agregara feedback.
 ALTER TABLE contenido_linkedin ADD COLUMN IF NOT EXISTS feedback TEXT;
+ALTER TABLE contenido_linkedin ADD COLUMN IF NOT EXISTS programado_en TIMESTAMPTZ;
+ALTER TABLE contenido_linkedin ADD COLUMN IF NOT EXISTS metricool_post_id TEXT;
 
 -- Productos iniciales (no pisa nada si ya existen).
 INSERT INTO productos (slug, nombre) VALUES ('talent', 'In Move Talent') ON CONFLICT (slug) DO NOTHING;
