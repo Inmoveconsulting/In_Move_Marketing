@@ -37,7 +37,10 @@ function dataUriToBlob(dataUri) {
 // referencias: array de data URIs (imágenes de estilo de Identidad visual). Si hay al
 // menos una, se usa /v1/images/edits (genera guiándose por esas imágenes). Si no hay
 // ninguna, se usa /v1/images/generations (texto a imagen puro, sin referencia visual).
-async function generarFondoImagen({ prompt, referencias }) {
+// size: tamaño que soporta gpt-image-1 ('1024x1024' cuadrado, '1024x1536' vertical,
+// '1536x1024' horizontal) — lo elige routes/contenido.js según el formato de la pieza
+// (ver FORMATOS_IMAGEN), default cuadrado si no se pasa nada.
+async function generarFondoImagen({ prompt, referencias, size }) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     const err = new Error('Falta configurar OPENAI_API_KEY en las variables de entorno del servicio.');
@@ -47,13 +50,14 @@ async function generarFondoImagen({ prompt, referencias }) {
 
   const promptResuelto = resolverOpcionesDePrompt(prompt);
   const refs = (referencias || []).filter(Boolean);
+  const sizeFinal = size || '1024x1024';
   let res;
 
   if (refs.length > 0) {
     const form = new FormData();
     form.append('model', MODEL);
     form.append('prompt', promptResuelto);
-    form.append('size', '1024x1024');
+    form.append('size', sizeFinal);
     form.append('n', '1');
     refs.forEach((dataUri, i) => {
       form.append('image[]', dataUriToBlob(dataUri), `referencia_${i}.png`);
@@ -71,7 +75,7 @@ async function generarFondoImagen({ prompt, referencias }) {
         Authorization: `Bearer ${apiKey}`,
         'content-type': 'application/json',
       },
-      body: JSON.stringify({ model: MODEL, prompt: promptResuelto, size: '1024x1024', n: 1 }),
+      body: JSON.stringify({ model: MODEL, prompt: promptResuelto, size: sizeFinal, n: 1 }),
     });
   }
 

@@ -95,39 +95,54 @@
       <% if (readonly) { %>
         <ul class="canales-list">
           <% (plan.canales || []).forEach(function (c) { %>
-            <li><strong><%= c.canal %></strong> — <%= c.veces_por_semana %>x/semana<% if (c.dias) { %> (<%= c.dias %>)<% } %></li>
+            <li><strong><%= c.canal %></strong><% if (c.formato) { %> · <%= c.formato %><% } %> — <%= c.veces_por_semana %>x/semana<% if (c.dias) { %> (<%= c.dias %>)<% } %></li>
           <% }); %>
         </ul>
         <div class="field-readonly"><%= plan.canales_razon || '—' %></div>
       <% } else { %>
         <% if (iaDisponible) { %>
           <form method="POST" action="/productos/<%= producto.slug %>/plan/sugerir-canales" class="callout">
-            <p>La IA puede sugerir qué canales usar según objetivo, perfil y público objetivo — no asume LinkedIn + Instagram de entrada.</p>
+            <p>La IA puede sugerir qué canales y formatos usar según objetivo, perfil y público objetivo — no asume LinkedIn + Instagram de entrada.</p>
             <button type="submit">Sugerir canales con IA</button>
           </form>
         <% } %>
+        <p class="field-help">
+          Cada formato necesita una imagen con proporción distinta (Post/Feed casi
+          cuadrado, Reels/Story vertical) — por eso Instagram aparece en varias filas, una
+          por formato, en vez de una sola fila genérica.
+        </p>
         <form method="POST" action="/productos/<%= producto.slug %>/plan/canales">
           <table class="table canales-form">
-            <thead><tr><th></th><th>Canal</th><th>Veces/semana</th><th>Días</th></tr></thead>
+            <thead><tr><th></th><th>Canal</th><th>Formato</th><th>Veces/semana</th><th>Días</th></tr></thead>
             <tbody>
-              <% canalesCanonicos.forEach(function (nombre) { %>
+              <% canalesCanonicos.forEach(function (canonico) { %>
                 <%
-                  const slug = slugCanal(nombre);
-                  const entry = (plan.canales || []).find((c) => (c.canal || '').toLowerCase() === nombre.toLowerCase());
+                  const slug = slugCanal(canonico);
+                  const entry = (plan.canales || []).find((c) =>
+                    (c.canal || '').toLowerCase() === canonico.canal.toLowerCase() &&
+                    (!canonico.formato || (c.formato || '') === canonico.formato)
+                  );
                 %>
                 <tr>
                   <td><input type="checkbox" name="canal_<%= slug %>_usar" <%= entry ? 'checked' : '' %>></td>
-                  <td><%= nombre %></td>
+                  <td><%= canonico.canal %></td>
+                  <td><%= canonico.formato || '—' %></td>
                   <td><input type="number" name="canal_<%= slug %>_veces" min="0" step="1" value="<%= entry ? entry.veces_por_semana : '' %>" style="max-width:80px"></td>
                   <td><input type="text" name="canal_<%= slug %>_dias" value="<%= entry ? entry.dias : '' %>" placeholder="ej: lunes, miércoles"></td>
                 </tr>
               <% }); %>
               <%
-                const otro = (plan.canales || []).find((c) => !canalesCanonicos.some((n) => n.toLowerCase() === (c.canal || '').toLowerCase()));
+                const otro = (plan.canales || []).find((c) =>
+                  !canalesCanonicos.some((canonico) =>
+                    canonico.canal.toLowerCase() === (c.canal || '').toLowerCase() &&
+                    (!canonico.formato || canonico.formato === (c.formato || ''))
+                  )
+                );
               %>
               <tr>
                 <td></td>
                 <td><input type="text" name="canal_otro_nombre" value="<%= otro ? otro.canal : '' %>" placeholder="Otro canal"></td>
+                <td class="muted small">sin formato</td>
                 <td><input type="number" name="canal_otro_veces" min="0" step="1" value="<%= otro ? otro.veces_por_semana : '' %>" style="max-width:80px"></td>
                 <td><input type="text" name="canal_otro_dias" value="<%= otro ? otro.dias : '' %>"></td>
               </tr>

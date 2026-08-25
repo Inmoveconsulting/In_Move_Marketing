@@ -129,6 +129,7 @@ CREATE TABLE IF NOT EXISTS contenido_generado (
   perfil_producto_id INTEGER NOT NULL REFERENCES perfiles_producto(id),
   semana INTEGER,
   canal TEXT NOT NULL,
+  formato TEXT DEFAULT '', -- Post/Feed/Reels/Story segun el canal (ver planes_marketing.canales) — define la proporcion de la imagen
   fecha_programada DATE,
   pilar TEXT,
   copy TEXT,
@@ -150,6 +151,7 @@ ALTER TABLE contenido_generado ADD COLUMN IF NOT EXISTS texto_imagen TEXT DEFAUL
 ALTER TABLE contenido_generado ADD COLUMN IF NOT EXISTS bajada_imagen TEXT DEFAULT '';
 ALTER TABLE contenido_generado ADD COLUMN IF NOT EXISTS programado_en TIMESTAMPTZ;
 ALTER TABLE contenido_generado ADD COLUMN IF NOT EXISTS metricool_post_id TEXT;
+ALTER TABLE contenido_generado ADD COLUMN IF NOT EXISTS formato TEXT DEFAULT '';
 
 -- contenido_linkedin: Pantalla 3b. Mensajes directos (1 a 1, sin imagen) y artículos/posts
 -- de LinkedIn (con imagen, mismo mecanismo que contenido_generado) para prospección

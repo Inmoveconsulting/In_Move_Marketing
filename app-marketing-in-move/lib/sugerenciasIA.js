@@ -71,12 +71,23 @@ Elegí canales de esta lista cuando corresponda (podés no usar todos, y podés 
 canal fuera de esta lista si tiene más sentido para este caso):
 LinkedIn, Instagram, Facebook, TikTok, YouTube, Email
 
+Para LinkedIn e Instagram, especificá también el FORMATO — no todos los formatos sirven
+para todo, y cada uno necesita una imagen con proporción distinta, así que es importante
+elegir con criterio, no poner varios "porque sí":
+- LinkedIn: "Post" (por ahora es el único formato que maneja el sistema para LinkedIn).
+- Instagram: elegí uno o más de "Feed", "Reels", "Story", según el objetivo — Reels/Story
+  sirven para alcance y frecuencia de contacto, Feed para piezas más elaboradas que
+  conviene que queden guardadas en el perfil. Si sugerís más de un formato de Instagram,
+  agregá una fila de canal separada por cada uno (no los mezcles en una sola fila).
+Para Facebook, TikTok, YouTube y Email dejá el campo "formato" vacío (todavía no
+distinguen formatos en este sistema).
+
 Respondé con este JSON exacto, sin nada más alrededor. Sé breve en "razon_general" (2 a 3
 oraciones cortas, no más) para que la respuesta no se corte, y no agregues campos extra:
 {
   "razon_general": "<2 a 3 oraciones breves explicando la elección de canales>",
   "canales": [
-    {"canal": "<nombre>", "veces_por_semana": <número entero>, "dias": "<ej: lunes, miércoles, viernes>"}
+    {"canal": "<nombre>", "formato": "<Post/Feed/Reels/Story, o vacío si no aplica>", "veces_por_semana": <número entero>, "dias": "<ej: lunes, miércoles, viernes>"}
   ]
 }
 `.trim();
@@ -180,9 +191,11 @@ Devolvé solo el texto final del copy, listo para publicar.
 // de LinkedIn/Instagram: un titular corto y contundente + una línea de apoyo debajo que
 // lo aterriza). Se compone con código (ver lib/imagenPieza.js), no lo dibuja la IA de
 // imagen.
-async function sugerirTitularYBajada({ perfil, pilar, copy }) {
+async function sugerirTitularYBajada({ perfil, pilar, copy, formato }) {
   const system =
     'Sos un copywriter B2B experto en piezas visuales para redes (tipo tarjetas de LinkedIn/Instagram). Escribís en español. Respondés ÚNICAMENTE con JSON válido, sin texto extra antes o después, sin bloques de código.';
+
+  const esStory = formato === 'Story' || formato === 'Reels';
 
   const prompt = `
 TONO DE VOZ DE LA MARCA:
@@ -197,7 +210,16 @@ ${pilar.descripcion}
 COPY COMPLETO DE ESTA PIEZA (para que el titular y la bajada estén alineados con esto, no
 lo repitan literal):
 ${copy}
-
+${
+  esStory
+    ? `\nOJO — ESTO VA A UN ${formato.toUpperCase()} DE INSTAGRAM, NO A UN FEED: en este
+formato el copy de arriba prácticamente no se ve (no hay un texto de posteo visible con la
+misma prominencia que en el feed) — el titular y la bajada son, en la práctica, el mensaje
+completo que la audiencia va a leer. Tienen que poder entenderse solos, como una idea
+cerrada, sin depender de que alguien lea el copy para que tenga sentido. No los escribas
+como un simple gancho que "engancha para el copy" — escribilos como el mensaje en sí.\n`
+    : ''
+}
 Tarea: escribí el titular y la bajada para superponer sobre la imagen de esta pieza —
 como una tarjeta de LinkedIn/Instagram, no el copy completo:
 - "titular": el gancho, corto y contundente. Máximo 8 palabras. Sin punto final.

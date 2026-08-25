@@ -61,7 +61,7 @@
         <div class="piezas-grid">
           <% s.piezas.forEach(function (p) { %>
             <div class="pieza-card" id="pieza-<%= p.id %>">
-              <span class="badge badge-vacio"><%= p.canal %></span>
+              <span class="badge badge-vacio"><%= p.canal %><% if (p.formato) { %> · <%= p.formato %><% } %></span>
               <form method="POST" action="/productos/<%= producto.slug %>/contenido/pieza/<%= p.id %>/copy">
                 <textarea id="copy-<%= p.id %>" name="copy" rows="8"><%= p.copy || '' %></textarea>
                 <div class="form-actions">

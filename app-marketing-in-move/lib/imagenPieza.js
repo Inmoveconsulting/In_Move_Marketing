@@ -11,7 +11,7 @@ const path = require('path');
 const sharp = require('sharp');
 const { Resvg } = require('@resvg/resvg-js');
 
-const LADO = 1080; // cuadrado, sirve igual para LinkedIn e Instagram
+const LADO = 1080; // default (LinkedIn Post / formatos cuadrados) — otros formatos pasan su propio ancho/alto
 const FONT_PATH = path.join(__dirname, '..', 'assets', 'fonts', 'Inter-Variable.ttf');
 
 function escaparXml(texto) {
@@ -56,7 +56,9 @@ function envolverTexto(texto, maxCaracteresPorLinea, maxLineas) {
 // arriba terminaba cortando justo la cara de las personas en la foto — abajo suele haber
 // mesa/laptop, corta mucho menos. Transparente en todo lo demás, para que al componer se
 // vea la foto de fondo debajo.
-function construirSvgOverlay({ titular, bajada, conLogo }) {
+function construirSvgOverlay({ titular, bajada, conLogo, ancho, alto }) {
+  const w = ancho || LADO;
+  const h = alto || LADO;
   const tamañoTitular = 58;
   const interlineadoTitular = 66;
   const tamañoBajada = 32;
@@ -65,13 +67,16 @@ function construirSvgOverlay({ titular, bajada, conLogo }) {
   const paddingBottom = 48;
   const gapEntreBloques = 18;
 
+  // El ancho de los formatos que maneja el sistema es siempre 1080 (solo cambia el alto
+  // según el formato — Post/Feed cuadrado, Reels/Story vertical) así que el ancho de
+  // línea para el texto no necesita ajustarse por formato.
   const lineasTitular = envolverTexto(titular, 22, 3);
   const lineasBajada = bajada ? envolverTexto(bajada, 40, 2) : [];
 
   const alturaTitular = lineasTitular.length * interlineadoTitular;
   const alturaBajada = lineasBajada.length ? gapEntreBloques + lineasBajada.length * interlineadoBajada : 0;
   const altoBanda = paddingTop + alturaTitular + alturaBajada + paddingBottom;
-  const yBanda = LADO - altoBanda;
+  const yBanda = h - altoBanda;
 
   const titularSvg = lineasTitular
     .map((linea, i) => `<tspan x="60" dy="${i === 0 ? 0 : interlineadoTitular}">${escaparXml(linea)}</tspan>`)
@@ -83,14 +88,14 @@ function construirSvgOverlay({ titular, bajada, conLogo }) {
     .join('');
 
   return `
-<svg width="${LADO}" height="${LADO}" xmlns="http://www.w3.org/2000/svg">
+<svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <linearGradient id="banda" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0%" stop-color="#0b1b2b" stop-opacity="0.55" />
       <stop offset="100%" stop-color="#0b1b2b" stop-opacity="0.92" />
     </linearGradient>
   </defs>
-  <rect x="0" y="${yBanda}" width="${LADO}" height="${altoBanda}" fill="url(#banda)" />
+  <rect x="0" y="${yBanda}" width="${w}" height="${altoBanda}" fill="url(#banda)" />
   <text x="60" y="${yBanda + paddingTop + tamañoTitular * 0.8}" font-family="Inter" font-size="${tamañoTitular}" fill="#ffffff" font-weight="700">${titularSvg}</text>
   ${
     lineasBajada.length
@@ -106,9 +111,9 @@ function construirSvgOverlay({ titular, bajada, conLogo }) {
 }
 
 // Rasteriza el SVG del overlay a PNG con resvg, cargando la fuente directo del archivo.
-function overlayAPng(svgString) {
+function overlayAPng(svgString, ancho) {
   const resvg = new Resvg(svgString, {
-    fitTo: { mode: 'width', value: LADO },
+    fitTo: { mode: 'width', value: ancho || LADO },
     background: 'rgba(0,0,0,0)',
     font: {
       fontFiles: [FONT_PATH],
@@ -119,17 +124,22 @@ function overlayAPng(svgString) {
   return resvg.render().asPng();
 }
 
-async function crearImagenPieza({ fondoDataUri, titular, bajada, logoDataUri }) {
+// ancho/alto: dimensiones del formato final (ver FORMATOS_IMAGEN en routes/contenido.js).
+// Default 1080x1080 (cuadrado, LinkedIn Post) si no se pasan — mantiene el comportamiento
+// de antes de que existieran formatos verticales (Reels/Story).
+async function crearImagenPieza({ fondoDataUri, titular, bajada, logoDataUri, ancho, alto }) {
   if (!fondoDataUri) {
     throw new Error('Falta una imagen de fondo (subí referencias en Identidad visual).');
   }
+  const w = ancho || LADO;
+  const h = alto || LADO;
 
   const fondoBuffer = Buffer.from(fondoDataUri.split(',')[1], 'base64');
   const fondo = await sharp(fondoBuffer)
-    .resize({ width: LADO, height: LADO, fit: 'cover', position: 'attention' })
+    .resize({ width: w, height: h, fit: 'cover', position: 'attention' })
     .toBuffer();
 
-  const overlayPng = overlayAPng(construirSvgOverlay({ titular, bajada, conLogo: !!logoDataUri }));
+  const overlayPng = overlayAPng(construirSvgOverlay({ titular, bajada, conLogo: !!logoDataUri, ancho: w, alto: h }), w);
   const composicion = [{ input: overlayPng, top: 0, left: 0 }];
 
   if (logoDataUri) {

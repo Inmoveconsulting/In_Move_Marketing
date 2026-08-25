@@ -30,6 +30,24 @@ const { crearImagenPieza } = require('../lib/imagenPieza');
 
 const CANALES_SIN_IMAGEN = ['Email'];
 
+// Dimensiones finales por canal+formato (ver planes_marketing.canales) — el ancho es
+// siempre 1080 (ver nota en lib/imagenPieza.js, el texto no necesita reajustarse por
+// formato), solo cambia el alto. openaiSize es el tamaño soportado por gpt-image-1 más
+// parecido (1024x1024 cuadrado, 1024x1536 vertical — no ofrece un tamaño exacto para
+// 1080x1350/1080x1920, así que se genera en el vertical más cercano y se recorta/ajusta
+// al componer, ver crearImagenPieza).
+const FORMATOS_IMAGEN = {
+  'LinkedIn|Post': { ancho: 1080, alto: 1080, openaiSize: '1024x1024' },
+  'Instagram|Feed': { ancho: 1080, alto: 1350, openaiSize: '1024x1536' },
+  'Instagram|Reels': { ancho: 1080, alto: 1920, openaiSize: '1024x1536' },
+  'Instagram|Story': { ancho: 1080, alto: 1920, openaiSize: '1024x1536' },
+};
+const FORMATO_DEFAULT = { ancho: 1080, alto: 1080, openaiSize: '1024x1024' };
+
+function dimensionesDe(canal, formato) {
+  return FORMATOS_IMAGEN[`${canal}|${formato || ''}`] || FORMATO_DEFAULT;
+}
+
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 6 * 1024 * 1024 }, // 6MB por archivo
@@ -94,10 +112,12 @@ async function generarImagenParaPieza({ pieza, plan, perfil, identidad, titularO
   let titular = (titularOverride || pieza.texto_imagen || '').trim();
   let bajada = (bajadaOverride || pieza.bajada_imagen || '').trim();
   if (!titular) {
-    const sugerido = await sugerirTitularYBajada({ perfil, pilar: pilarObj, copy: pieza.copy });
+    const sugerido = await sugerirTitularYBajada({ perfil, pilar: pilarObj, copy: pieza.copy, formato: pieza.formato });
     titular = sugerido.titular;
     bajada = sugerido.bajada;
   }
+
+  const { ancho, alto, openaiSize } = dimensionesDe(pieza.canal, pieza.formato);
 
   const prompt = `
 ${identidad.prompt_imagen}
@@ -115,7 +135,7 @@ Encuadre sugerido, adaptalo a lo que pida el copy de arriba si hace falta: ${tom
 Usá personas y escenas distintas de las de otras piezas — no repitas siempre la misma
 cara ni la misma composición.
 
-No incluyas texto ni logos en la imagen — eso se agrega aparte. Formato cuadrado.
+No incluyas texto ni logos en la imagen — eso se agrega aparte. Formato ${alto > ancho ? 'vertical, tipo Story/Reel — encuadrá pensando en una pantalla de celular completa, no en una foto cuadrada recortada' : 'cuadrado'}.
 `.trim();
 
   // No le mandamos las fotos de referencia como imagen de entrada: el modo "editar a
@@ -123,12 +143,14 @@ No incluyas texto ni logos en la imagen — eso se agrega aparte. Formato cuadra
   // que se le pida en el texto — es como funciona ese modo, no algo instruible. Guiamos
   // el estilo solo con palabras (el prompt de arriba), así cada pieza sale con personas
   // y escenas distintas de verdad.
-  const fondo = await generarFondoImagen({ prompt, referencias: [] });
+  const fondo = await generarFondoImagen({ prompt, referencias: [], size: openaiSize });
   const imagen = await crearImagenPieza({
     fondoDataUri: fondo,
     titular,
     bajada,
     logoDataUri: identidad.logo,
+    ancho,
+    alto,
   });
 
   return { imagen, titular, bajada };
@@ -220,20 +242,24 @@ router.post('/generar-semana', async (req, res, next) => {
       );
     }
 
+    // Se cuenta por canal+formato, no solo canal — con Instagram repartido en varias filas
+    // del plan (Feed/Reels/Story), "Instagram" solo no alcanza para saber qué falta de
+    // cada formato puntual.
     const { rows: existentes } = await pool.query(
-      `SELECT canal, COUNT(*)::int AS cantidad FROM contenido_generado
-       WHERE plan_marketing_id = $1 AND semana = $2 GROUP BY canal`,
+      `SELECT canal, formato, COUNT(*)::int AS cantidad FROM contenido_generado
+       WHERE plan_marketing_id = $1 AND semana = $2 GROUP BY canal, formato`,
       [plan.id, numero]
     );
-    const existentesPorCanal = {};
+    const existentesPorCanalFormato = {};
     existentes.forEach((e) => {
-      existentesPorCanal[e.canal] = e.cantidad;
+      existentesPorCanalFormato[`${e.canal}|${e.formato || ''}`] = e.cantidad;
     });
 
     const tareas = [];
     plan.canales.forEach((c) => {
-      const faltan = Math.max(0, (c.veces_por_semana || 0) - (existentesPorCanal[c.canal] || 0));
-      for (let i = 0; i < faltan; i += 1) tareas.push(c.canal);
+      const key = `${c.canal}|${c.formato || ''}`;
+      const faltan = Math.max(0, (c.veces_por_semana || 0) - (existentesPorCanalFormato[key] || 0));
+      for (let i = 0; i < faltan; i += 1) tareas.push({ canal: c.canal, formato: c.formato || '' });
     });
 
     if (tareas.length === 0) {
@@ -242,7 +268,7 @@ router.post('/generar-semana', async (req, res, next) => {
 
     const perfil = await getPerfilPorId(plan.perfil_producto_id);
     const resultados = await Promise.allSettled(
-      tareas.map((canal) => sugerirCopy({ perfil, objetivoPlan: plan.objetivo, pilar, canal }))
+      tareas.map((t) => sugerirCopy({ perfil, objetivoPlan: plan.objetivo, pilar, canal: t.canal }))
     );
 
     let fallos = 0;
@@ -251,9 +277,9 @@ router.post('/generar-semana', async (req, res, next) => {
       if (r.status === 'fulfilled') {
         await pool.query(
           `INSERT INTO contenido_generado
-            (plan_marketing_id, perfil_producto_id, semana, canal, pilar, copy, estado)
-           VALUES ($1, $2, $3, $4, $5, $6, 'borrador')`,
-          [plan.id, plan.perfil_producto_id, numero, tareas[i], pilar.pilar, r.value]
+            (plan_marketing_id, perfil_producto_id, semana, canal, formato, pilar, copy, estado)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, 'borrador')`,
+          [plan.id, plan.perfil_producto_id, numero, tareas[i].canal, tareas[i].formato, pilar.pilar, r.value]
         );
       } else {
         fallos += 1;

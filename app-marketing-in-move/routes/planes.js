@@ -14,22 +14,46 @@ const { sugerirDuracion, sugerirCanales, sugerirCalendario } = require('../lib/s
 // perfil en estado aprobado (se valida en cada ruta que crea/edita). El orden de la spec
 // se respeta como gate secuencial: objetivo -> duracion -> canales -> calendario -> aprobar.
 
-const CANALES_CANONICOS = ['LinkedIn', 'Instagram', 'Facebook', 'TikTok', 'YouTube', 'Email'];
+// Cada fila es un canal + formato específico, no solo la red — porque el formato define
+// la proporción de la imagen (Post/Feed cuadrado o casi, Reels/Story vertical 9:16) y eso
+// no se puede resolver a nivel "Instagram" en general. formato: null = esa red todavía no
+// distingue formatos en este sistema (se guarda como fila única, sin ese dato).
+const CANALES_CANONICOS = [
+  { canal: 'LinkedIn', formato: 'Post' },
+  { canal: 'Instagram', formato: 'Feed' },
+  { canal: 'Instagram', formato: 'Reels' },
+  { canal: 'Instagram', formato: 'Story' },
+  { canal: 'Facebook', formato: null },
+  { canal: 'TikTok', formato: null },
+  { canal: 'YouTube', formato: null },
+  { canal: 'Email', formato: null },
+];
 const MAX_PILARES = 6;
 
-function slugCanal(nombre) {
-  return nombre.toLowerCase().replace(/[^a-z0-9]+/g, '_');
+function slugCanal({ canal, formato }) {
+  const base = formato ? `${canal}_${formato}` : canal;
+  return base.toLowerCase().replace(/[^a-z0-9]+/g, '_');
+}
+
+// Compara una entrada guardada contra una fila canónica — por canal, y por formato solo
+// si esa red distingue formato (si formato es null, alcanza con que coincida el canal, así
+// no se pierden entradas viejas guardadas antes de que existiera este campo).
+function coincide(entry, canonico) {
+  if ((entry.canal || '').toLowerCase() !== canonico.canal.toLowerCase()) return false;
+  if (!canonico.formato) return true;
+  return (entry.formato || '') === canonico.formato;
 }
 
 // Reconstruye el array de canales a partir de los campos fijos del formulario
 // (canal_<slug>_usar / _veces / _dias, mas una fila "otro" libre).
 function leerCanalesDelBody(body) {
   const canales = [];
-  for (const nombre of CANALES_CANONICOS) {
-    const slug = slugCanal(nombre);
+  for (const canonico of CANALES_CANONICOS) {
+    const slug = slugCanal(canonico);
     if (body[`canal_${slug}_usar`]) {
       canales.push({
-        canal: nombre,
+        canal: canonico.canal,
+        formato: canonico.formato || '',
         veces_por_semana: parseInt(body[`canal_${slug}_veces`], 10) || 0,
         dias: (body[`canal_${slug}_dias`] || '').trim(),
       });
@@ -39,6 +63,7 @@ function leerCanalesDelBody(body) {
   if (otroNombre) {
     canales.push({
       canal: otroNombre,
+      formato: '',
       veces_por_semana: parseInt(body.canal_otro_veces, 10) || 0,
       dias: (body.canal_otro_dias || '').trim(),
     });

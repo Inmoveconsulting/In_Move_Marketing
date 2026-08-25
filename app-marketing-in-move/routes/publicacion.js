@@ -90,6 +90,23 @@ router.get('/imagen/:origen/:id.png', async (req, res, next) => {
   }
 });
 
+// Mapa de nuestro "formato" interno al postType que espera Metricool para Instagram —
+// visto en su propio editor de publicaciones (captura de la usuaria, 25-ago-2026): el
+// selector junto al ícono de Instagram ofrece "Post" (imagen o carrusel), "Reel" (video),
+// "Historia" (una o varias historias). El NOMBRE del campo y de estos valores en la API
+// (no solo en la UI) es una estimación nuestra, no está confirmado en documentación
+// pública — si programar una pieza de Reels/Story falla, el error de Metricool debería
+// mostrar la forma real esperada; ajustar acá con ese dato, no adivinar de nuevo a ciegas.
+const POST_TYPE_INSTAGRAM = { Feed: 'POST', Reels: 'REEL', Story: 'STORY' };
+
+function construirProvider(canal, formato) {
+  const network = canal.toLowerCase();
+  if (network === 'instagram' && POST_TYPE_INSTAGRAM[formato]) {
+    return { network, postType: POST_TYPE_INSTAGRAM[formato] };
+  }
+  return { network };
+}
+
 router.get('/', async (req, res, next) => {
   try {
     const { rows: piezasContenido } = await pool.query(
@@ -244,7 +261,7 @@ router.post('/pieza/:origen/:id/programar', async (req, res, next) => {
     const resultado = await programarPost({
       texto,
       fechaHoraIso,
-      providers: [{ network: canal.toLowerCase() }],
+      providers: [construirProvider(canal, pieza.formato)],
       imagenes,
     });
 
