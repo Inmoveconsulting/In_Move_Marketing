@@ -74,28 +74,56 @@
               </form>
 
               <% if (!canalesSinImagen.includes(p.canal)) { %>
-                <% if (p.imagen_ref) { %>
-                  <img class="identidad-thumb" src="<%= p.imagen_ref %>" alt="Imagen de la pieza">
-                <% } %>
+                <% if (p.usa_video) { %>
+                  <p class="muted small">🎥 Esta pieza usa video — se programa solo con el copy, sin imagen. Subí el video a mano en el planificador de Metricool antes de que se publique.</p>
+                  <form method="POST" action="/productos/<%= producto.slug %>/contenido/pieza/<%= p.id %>/usar-imagen">
+                    <div class="form-actions"><button type="submit">Volver a imagen</button></div>
+                  </form>
+                <% } else { %>
+                  <% if (p.imagenes_carrusel && p.imagenes_carrusel.length > 0) { %>
+                    <p class="muted small">Carrusel · <%= p.imagenes_carrusel.length %> slides</p>
+                    <div class="carrusel-scroll">
+                      <% p.imagenes_carrusel.forEach(function (img, i) { %>
+                        <img class="identidad-thumb" src="<%= img %>" alt="Slide <%= i + 1 %>">
+                      <% }); %>
+                    </div>
+                  <% } else if (p.imagen_ref) { %>
+                    <img class="identidad-thumb" src="<%= p.imagen_ref %>" alt="Imagen de la pieza">
+                  <% } %>
 
-                <% if (hayIdentidad) { %>
-                  <form method="POST" action="/productos/<%= producto.slug %>/contenido/pieza/<%= p.id %>/imagen-ia">
-                    <label class="muted small">Titular (vacío = lo escribe la IA)</label>
-                    <textarea name="texto_imagen" rows="2"><%= p.texto_imagen || '' %></textarea>
-                    <label class="muted small">Bajada</label>
-                    <textarea name="bajada_imagen" rows="2"><%= p.bajada_imagen || '' %></textarea>
+                  <% if (hayIdentidad) { %>
+                    <form method="POST" action="/productos/<%= producto.slug %>/contenido/pieza/<%= p.id %>/imagen-ia">
+                      <label class="muted small">Titular (vacío = lo escribe la IA)</label>
+                      <textarea name="texto_imagen" rows="2"><%= p.texto_imagen || '' %></textarea>
+                      <label class="muted small">Bajada</label>
+                      <textarea name="bajada_imagen" rows="2"><%= p.bajada_imagen || '' %></textarea>
+                      <div class="form-actions">
+                        <button type="submit"><%= p.imagen_ref ? 'Regenerar imagen' : 'Crear imagen' %></button>
+                      </div>
+                    </form>
+
+                    <% if (!['Reels', 'Story'].includes(p.formato)) { %>
+                      <form method="POST" action="/productos/<%= producto.slug %>/contenido/pieza/<%= p.id %>/carrusel">
+                        <div class="form-actions">
+                          <button type="submit"><%= (p.imagenes_carrusel && p.imagenes_carrusel.length > 0) ? 'Regenerar carrusel' : 'Crear carrusel' %></button>
+                        </div>
+                      </form>
+                    <% } %>
+                  <% } %>
+
+                  <form method="POST" action="/productos/<%= producto.slug %>/contenido/pieza/<%= p.id %>/imagen" enctype="multipart/form-data">
+                    <input type="file" name="imagen" accept="image/*">
                     <div class="form-actions">
-                      <button type="submit"><%= p.imagen_ref ? 'Regenerar imagen' : 'Crear imagen' %></button>
+                      <button type="submit">O subir la mía</button>
+                    </div>
+                  </form>
+
+                  <form method="POST" action="/productos/<%= producto.slug %>/contenido/pieza/<%= p.id %>/usar-video">
+                    <div class="form-actions">
+                      <button type="submit">Usar video (lo subo a mano en Metricool)</button>
                     </div>
                   </form>
                 <% } %>
-
-                <form method="POST" action="/productos/<%= producto.slug %>/contenido/pieza/<%= p.id %>/imagen" enctype="multipart/form-data">
-                  <input type="file" name="imagen" accept="image/*">
-                  <div class="form-actions">
-                    <button type="submit">O subir la mía</button>
-                  </div>
-                </form>
               <% } else { %>
                 <p class="muted small" style="margin-top:10px">Este canal no lleva imagen.</p>
               <% } %>

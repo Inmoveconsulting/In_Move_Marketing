@@ -9,9 +9,9 @@ const {
   getPerfilPorId,
   getIdentidadVisualAprobadaActual,
 } = require('../lib/queries');
-const { sugerirCopy, sugerirTitularYBajada } = require('../lib/sugerenciasIA');
+const { sugerirCopy, sugerirTitularYBajada, sugerirCarrusel } = require('../lib/sugerenciasIA');
 const { generarFondoImagen } = require('../lib/openaiImagenes');
-const { crearImagenPieza } = require('../lib/imagenPieza');
+const { crearImagenPieza, crearTarjetaPersonal, crearCarrusel } = require('../lib/imagenPieza');
 
 // Pantalla 3 — Generación de contenido. Se genera por tramo (semana), no el plan completo
 // de una (regla de la spec). El pilar de cada semana rota sobre el calendario del plan.
@@ -101,9 +101,46 @@ function tomaAleatoria() {
   return TOMAS[Math.floor(Math.random() * TOMAS.length)];
 }
 
-// Arma el fondo (vía OpenAI) + compone el titular + bajada + logo encima (vía código). Si
-// no se pasa un override, usa lo que ya tenía la pieza o le pide un par nuevo a la IA.
+// Arma el titular+bajada (vía IA) y compone la imagen final con el formato "tarjeta
+// personal" (fondo de color de marca + logo + titular/bajada + firma) — reemplazó al
+// formato de foto generada por IA a partir del 25-ago-2026, por pedido de la usuaria: más
+// barato (no llama a OpenAI), más consistente entre piezas, y con más autoridad de marca
+// personal para LinkedIn. El código del formato anterior queda como
+// generarImagenIAConOpenAI más abajo, sin usar — no se borró por si se quiere revivir o
+// alternar entre los dos formatos más adelante.
 async function generarImagenParaPieza({ pieza, plan, perfil, identidad, titularOverride, bajadaOverride }) {
+  const pilarObj = (plan.calendario || []).find((p) => p.pilar === pieza.pilar) || {
+    pilar: pieza.pilar,
+    descripcion: '',
+  };
+
+  let titular = (titularOverride || pieza.texto_imagen || '').trim();
+  let bajada = (bajadaOverride || pieza.bajada_imagen || '').trim();
+  if (!titular) {
+    const sugerido = await sugerirTitularYBajada({ perfil, pilar: pilarObj, copy: pieza.copy, formato: pieza.formato });
+    titular = sugerido.titular;
+    bajada = sugerido.bajada;
+  }
+
+  const { ancho, alto } = dimensionesDe(pieza.canal, pieza.formato);
+  const imagen = await crearTarjetaPersonal({
+    titular,
+    bajada,
+    logoDataUri: identidad.logo,
+    autorFotoDataUri: identidad.autor_foto,
+    autorNombre: identidad.autor_nombre,
+    autorCargo: identidad.autor_cargo,
+    ancho,
+    alto,
+  });
+
+  return { imagen, titular, bajada };
+}
+
+// Formato anterior (foto generada por IA vía OpenAI) — sin usar desde el 25-ago-2026, se
+// deja completo por si se quiere volver a este formato o alternar entre los dos.
+// eslint-disable-next-line no-unused-vars
+async function generarImagenIAConOpenAI({ pieza, plan, perfil, identidad, titularOverride, bajadaOverride }) {
   const pilarObj = (plan.calendario || []).find((p) => p.pilar === pieza.pilar) || {
     pilar: pieza.pilar,
     descripcion: '',
@@ -138,11 +175,6 @@ cara ni la misma composición.
 No incluyas texto ni logos en la imagen — eso se agrega aparte. Formato ${alto > ancho ? 'vertical, tipo Story/Reel — encuadrá pensando en una pantalla de celular completa, no en una foto cuadrada recortada' : 'cuadrado'}.
 `.trim();
 
-  // No le mandamos las fotos de referencia como imagen de entrada: el modo "editar a
-  // partir de una foto" de OpenAI copia literal a la persona de esa foto sin importar lo
-  // que se le pida en el texto — es como funciona ese modo, no algo instruible. Guiamos
-  // el estilo solo con palabras (el prompt de arriba), así cada pieza sale con personas
-  // y escenas distintas de verdad.
   const fondo = await generarFondoImagen({ prompt, referencias: [], size: openaiSize });
   const imagen = await crearImagenPieza({
     fondoDataUri: fondo,
@@ -459,6 +491,68 @@ router.post('/pieza/:id/imagen-ia', async (req, res, next) => {
   }
 });
 
+// Crear (o regenerar) el carrusel de una pieza — varios slides que cuentan una historia
+// en secuencia, en vez de una sola imagen. Pisa imagen_ref (si tenía una imagen suelta,
+// deja de mostrarse — la pieza pasa a ser un carrusel). Pensado para usarse en al menos
+// una pieza de LinkedIn Post o Instagram Feed por semana, no en Reels/Story ni Email.
+router.post('/pieza/:id/carrusel', async (req, res, next) => {
+  try {
+    const { rows } = await pool.query('SELECT * FROM contenido_generado WHERE id = $1', [req.params.id]);
+    const pieza = rows[0];
+    if (!pieza || CANALES_SIN_IMAGEN.includes(pieza.canal)) {
+      return res.redirect(`/productos/${req.producto.slug}/contenido`);
+    }
+
+    const identidad = await getIdentidadVisualAprobadaActual(req.producto.id);
+    if (!identidad) {
+      return res.redirect(
+        `/productos/${req.producto.slug}/contenido?error=${encodeURIComponent('Necesitás aprobar Identidad visual antes de crear un carrusel.')}`
+      );
+    }
+
+    const { rows: planRows } = await pool.query('SELECT * FROM planes_marketing WHERE id = $1', [
+      pieza.plan_marketing_id,
+    ]);
+    const plan = planRows[0];
+    const perfil = await getPerfilPorId(pieza.perfil_producto_id);
+    const pilarObj = (plan.calendario || []).find((p) => p.pilar === pieza.pilar) || {
+      pilar: pieza.pilar,
+      descripcion: '',
+    };
+
+    const slides = await sugerirCarrusel({ perfil, pilar: pilarObj, copy: pieza.copy });
+    if (slides.length === 0) {
+      return res.redirect(
+        `/productos/${req.producto.slug}/contenido?error=${encodeURIComponent('La IA no devolvió ningún slide para el carrusel — probá de nuevo.')}`
+      );
+    }
+
+    const { ancho, alto } = dimensionesDe(pieza.canal, pieza.formato);
+    const imagenes = await crearCarrusel({
+      slides,
+      logoDataUri: identidad.logo,
+      autorFotoDataUri: identidad.autor_foto,
+      autorNombre: identidad.autor_nombre,
+      autorCargo: identidad.autor_cargo,
+      ancho,
+      alto,
+    });
+
+    await pool.query(
+      `UPDATE contenido_generado SET
+         imagenes_carrusel = $1, imagen_ref = NULL, texto_imagen = '', bajada_imagen = '',
+         actualizado_en = now()
+       WHERE id = $2`,
+      [JSON.stringify(imagenes), pieza.id]
+    );
+    res.redirect(`/productos/${req.producto.slug}/contenido#pieza-${pieza.id}`);
+  } catch (err) {
+    res.redirect(
+      `/productos/${req.producto.slug}/contenido?error=${encodeURIComponent('No se pudo crear el carrusel: ' + err.message)}`
+    );
+  }
+});
+
 // Subir/reemplazar la imagen de una pieza a mano (alternativa a la generada con IA).
 router.post('/pieza/:id/imagen', upload.single('imagen'), async (req, res, next) => {
   try {
@@ -474,6 +568,39 @@ router.post('/pieza/:id/imagen', upload.single('imagen'), async (req, res, next)
     res.redirect(
       `/productos/${req.producto.slug}/contenido?error=${encodeURIComponent(err.message)}`
     );
+  }
+});
+
+// Marca la pieza como "usa video" — reemplaza cualquier imagen/carrusel que tuviera (los
+// borra, no tiene sentido guardarlos si no se van a usar). La app NO genera ni guarda el
+// video: la pieza se programa igual en Metricool con el copy solo, sin imagen, y la
+// usuaria sube el video a mano en el planificador de Metricool antes de que se publique.
+// Reutiliza videos ya producidos para campañas de Meta, no genera nada nuevo.
+router.post('/pieza/:id/usar-video', async (req, res, next) => {
+  try {
+    await pool.query(
+      `UPDATE contenido_generado SET
+         usa_video = true, imagen_ref = NULL, imagenes_carrusel = '[]',
+         texto_imagen = '', bajada_imagen = '', actualizado_en = now()
+       WHERE id = $1`,
+      [req.params.id]
+    );
+    res.redirect(`/productos/${req.producto.slug}/contenido#pieza-${req.params.id}`);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Deshace "usar video" — vuelve a poder generar imagen/carrusel para esta pieza.
+router.post('/pieza/:id/usar-imagen', async (req, res, next) => {
+  try {
+    await pool.query(
+      `UPDATE contenido_generado SET usa_video = false, actualizado_en = now() WHERE id = $1`,
+      [req.params.id]
+    );
+    res.redirect(`/productos/${req.producto.slug}/contenido#pieza-${req.params.id}`);
+  } catch (err) {
+    next(err);
   }
 });
 

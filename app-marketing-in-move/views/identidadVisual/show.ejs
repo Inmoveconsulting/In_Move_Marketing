@@ -53,7 +53,13 @@
       <% if (iv.referencia_2) { %>
         <div><p class="muted small">Referencia 2</p><img class="identidad-thumb" src="<%= iv.referencia_2 %>" alt="Referencia 2"></div>
       <% } %>
+      <% if (iv.autor_foto) { %>
+        <div><p class="muted small">Foto de autor (tarjeta personal)</p><img class="identidad-thumb" src="<%= iv.autor_foto %>" alt="Foto de autor"></div>
+      <% } %>
     </div>
+    <% if (iv.autor_nombre) { %>
+      <p class="muted small" style="margin-top:16px">Firma de las tarjetas: <strong><%= iv.autor_nombre %></strong><% if (iv.autor_cargo) { %> — <%= iv.autor_cargo %><% } %></p>
+    <% } %>
     <p class="muted small" style="margin-top:16px">Prompt de imagen:</p>
     <div class="field-readonly"><%= iv.prompt_imagen %></div>
   <% } else { %>
@@ -75,7 +81,25 @@
       </div>
 
       <div class="field">
-        <label for="prompt_imagen">Prompt de tu imagen</label>
+        <label for="autor_foto">Foto de la persona que firma las tarjetas (formato "tarjeta personal")</label>
+        <p class="field-help">
+          Se usa en el formato de imagen plano — logo arriba, título y bajada, y esta foto
+          + nombre + cargo abajo, como firma. No se usa en el formato de foto generada por IA.
+        </p>
+        <% if (iv && iv.autor_foto) { %><img class="identidad-thumb" src="<%= iv.autor_foto %>" alt="Foto de autor actual"><% } %>
+        <input type="file" id="autor_foto" name="autor_foto" accept="image/*">
+      </div>
+      <div class="field">
+        <label for="autor_nombre">Nombre de la firma</label>
+        <input type="text" id="autor_nombre" name="autor_nombre" value="<%= (iv && iv.autor_nombre) || '' %>" placeholder="Ej: Mg. Fabiana Ruiz">
+      </div>
+      <div class="field">
+        <label for="autor_cargo">Cargo / empresa de la firma</label>
+        <input type="text" id="autor_cargo" name="autor_cargo" value="<%= (iv && iv.autor_cargo) || '' %>" placeholder="Ej: In Move Consulting">
+      </div>
+
+      <div class="field">
+        <label for="prompt_imagen">Prompt de tu imagen (formato foto generada por IA)</label>
         <p class="field-help">
           Este es el texto que se le va a mandar a la IA para generar el fondo de cada
           pieza. Podés modificarlo agregando o quitando instrucciones — por ejemplo mood

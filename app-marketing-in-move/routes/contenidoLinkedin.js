@@ -10,7 +10,7 @@ const {
 } = require('../lib/queries');
 const { sugerirCopyLinkedin, sugerirTitularYBajada } = require('../lib/sugerenciasIA');
 const { generarFondoImagen } = require('../lib/openaiImagenes');
-const { crearImagenPieza } = require('../lib/imagenPieza');
+const { crearImagenPieza, crearTarjetaPersonal } = require('../lib/imagenPieza');
 
 // Pantalla 3b — Mensajes directos y artículos de LinkedIn para prospección puntual.
 // Independiente del plan/calendario (no es por semana, es una lista suelta de piezas
@@ -81,10 +81,38 @@ function resolverTema(req) {
   return tema;
 }
 
-// Arma el fondo (vía OpenAI, texto solamente) + compone titular + bajada + logo encima
-// (código) — mismo motor que routes/contenido.js, adaptado a que acá no hay pilar/plan,
-// solo tema + contexto.
+// Arma titular+bajada (IA) y compone la imagen con el formato "tarjeta personal" (fondo
+// de color de marca + logo + titular/bajada + firma) — mismo cambio que
+// routes/contenido.js, ver esa nota para el porqué. El formato anterior (foto vía OpenAI)
+// queda como generarImagenIAConOpenAIArticulo más abajo, sin usar.
 async function generarImagenParaArticulo({ pieza, perfil, identidad, titularOverride, bajadaOverride }) {
+  let titular = (titularOverride || pieza.texto_imagen || '').trim();
+  let bajada = (bajadaOverride || pieza.bajada_imagen || '').trim();
+  if (!titular) {
+    const sugerido = await sugerirTitularYBajada({
+      perfil,
+      pilar: { pilar: pieza.tema, descripcion: pieza.contexto || '' },
+      copy: pieza.copy,
+    });
+    titular = sugerido.titular;
+    bajada = sugerido.bajada;
+  }
+
+  const imagen = await crearTarjetaPersonal({
+    titular,
+    bajada,
+    logoDataUri: identidad.logo,
+    autorFotoDataUri: identidad.autor_foto,
+    autorNombre: identidad.autor_nombre,
+    autorCargo: identidad.autor_cargo,
+  });
+
+  return { imagen, titular, bajada };
+}
+
+// Formato anterior (foto generada por IA vía OpenAI) — sin usar desde el 25-ago-2026.
+// eslint-disable-next-line no-unused-vars
+async function generarImagenIAConOpenAIArticulo({ pieza, perfil, identidad, titularOverride, bajadaOverride }) {
   let titular = (titularOverride || pieza.texto_imagen || '').trim();
   let bajada = (bajadaOverride || pieza.bajada_imagen || '').trim();
   if (!titular) {

@@ -63,7 +63,16 @@
           <% } %>
         <% } %>
 
-        <% if (p.imagen_ref) { %>
+        <% if (p.usa_video) { %>
+          <p class="muted small">🎥 Se programa solo con este copy, sin imagen — subí el video a mano en el planificador de Metricool antes de que se publique.</p>
+        <% } else if (p.imagenes_carrusel && p.imagenes_carrusel.length > 0) { %>
+          <p class="muted small">🎠 Carrusel · <%= p.imagenes_carrusel.length %> slides</p>
+          <div class="carrusel-scroll">
+            <% p.imagenes_carrusel.forEach(function (img, i) { %>
+              <img class="identidad-thumb" src="<%= img %>" alt="Slide <%= i + 1 %>">
+            <% }); %>
+          </div>
+        <% } else if (p.imagen_ref) { %>
           <img class="identidad-thumb" src="<%= p.imagen_ref %>" alt="Imagen de la pieza">
         <% } %>
 

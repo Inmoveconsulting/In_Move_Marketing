@@ -30,6 +30,7 @@ const camposArchivos = upload.fields([
   { name: 'logo', maxCount: 1 },
   { name: 'referencia_1', maxCount: 1 },
   { name: 'referencia_2', maxCount: 1 },
+  { name: 'autor_foto', maxCount: 1 },
 ]);
 
 // Normaliza cualquier formato (SVG incluido) a PNG, con un tamaño razonable.
@@ -143,6 +144,12 @@ router.post('/', camposArchivos, async (req, res, next) => {
       (await archivoADataUri(archivos.referencia_2 && archivos.referencia_2[0])) ||
       (actual && actual.referencia_2) ||
       null;
+    const autor_foto =
+      (await archivoADataUri(archivos.autor_foto && archivos.autor_foto[0])) ||
+      (actual && actual.autor_foto) ||
+      null;
+    const autor_nombre = (req.body.autor_nombre || '').trim() || (actual && actual.autor_nombre) || '';
+    const autor_cargo = (req.body.autor_cargo || '').trim() || (actual && actual.autor_cargo) || '';
 
     let prompt_imagen = (req.body.prompt_imagen || '').trim();
     if (!prompt_imagen) prompt_imagen = promptBase(perfilAprobado);
@@ -150,17 +157,18 @@ router.post('/', camposArchivos, async (req, res, next) => {
     if (!actual) {
       await pool.query(
         `INSERT INTO identidad_visual
-          (producto_id, version, estado, logo, referencia_1, referencia_2, prompt_imagen)
-         VALUES ($1, 1, 'borrador', $2, $3, $4, $5)`,
-        [req.producto.id, logo, referencia_1, referencia_2, prompt_imagen]
+          (producto_id, version, estado, logo, referencia_1, referencia_2, prompt_imagen,
+           autor_foto, autor_nombre, autor_cargo)
+         VALUES ($1, 1, 'borrador', $2, $3, $4, $5, $6, $7, $8)`,
+        [req.producto.id, logo, referencia_1, referencia_2, prompt_imagen, autor_foto, autor_nombre, autor_cargo]
       );
     } else {
       await pool.query(
         `UPDATE identidad_visual SET
            logo = $1, referencia_1 = $2, referencia_2 = $3, prompt_imagen = $4,
-           actualizado_en = now()
-         WHERE id = $5`,
-        [logo, referencia_1, referencia_2, prompt_imagen, actual.id]
+           autor_foto = $5, autor_nombre = $6, autor_cargo = $7, actualizado_en = now()
+         WHERE id = $8`,
+        [logo, referencia_1, referencia_2, prompt_imagen, autor_foto, autor_nombre, autor_cargo, actual.id]
       );
     }
 
@@ -192,14 +200,19 @@ router.post('/aprobar', camposArchivos, async (req, res, next) => {
       (await archivoADataUri(archivos.referencia_2 && archivos.referencia_2[0])) ||
       actual.referencia_2 ||
       null;
+    const autor_foto =
+      (await archivoADataUri(archivos.autor_foto && archivos.autor_foto[0])) || actual.autor_foto || null;
+    const autor_nombre = (req.body.autor_nombre || '').trim() || actual.autor_nombre || '';
+    const autor_cargo = (req.body.autor_cargo || '').trim() || actual.autor_cargo || '';
     const prompt_imagen = (req.body.prompt_imagen || '').trim() || actual.prompt_imagen;
 
     await pool.query(
       `UPDATE identidad_visual SET
          logo = $1, referencia_1 = $2, referencia_2 = $3, prompt_imagen = $4,
+         autor_foto = $5, autor_nombre = $6, autor_cargo = $7,
          estado = 'aprobado', aprobado_en = now(), actualizado_en = now()
-       WHERE id = $5`,
-      [logo, referencia_1, referencia_2, prompt_imagen, actual.id]
+       WHERE id = $8`,
+      [logo, referencia_1, referencia_2, prompt_imagen, autor_foto, autor_nombre, autor_cargo, actual.id]
     );
     res.redirect(`/productos/${req.producto.slug}/identidad-visual`);
   } catch (err) {
@@ -220,8 +233,9 @@ router.post('/nueva-version', async (req, res, next) => {
     const nuevaVersion = actual.version + 1;
     await pool.query(
       `INSERT INTO identidad_visual
-        (producto_id, version, estado, logo, referencia_1, referencia_2, prompt_imagen, version_origen_id)
-       VALUES ($1, $2, 'borrador', $3, $4, $5, $6, $7)`,
+        (producto_id, version, estado, logo, referencia_1, referencia_2, prompt_imagen,
+         autor_foto, autor_nombre, autor_cargo, version_origen_id)
+       VALUES ($1, $2, 'borrador', $3, $4, $5, $6, $7, $8, $9, $10)`,
       [
         req.producto.id,
         nuevaVersion,
@@ -229,6 +243,9 @@ router.post('/nueva-version', async (req, res, next) => {
         actual.referencia_1,
         actual.referencia_2,
         actual.prompt_imagen,
+        actual.autor_foto,
+        actual.autor_nombre,
+        actual.autor_cargo,
         actual.id,
       ]
     );

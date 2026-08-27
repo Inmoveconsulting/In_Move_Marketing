@@ -83,6 +83,9 @@ CREATE TABLE IF NOT EXISTS identidad_visual (
   logo TEXT,
   referencia_1 TEXT,
   referencia_2 TEXT,
+  autor_foto TEXT, -- foto de la persona que firma las tarjetas de texto (formato "tarjeta personal")
+  autor_nombre TEXT DEFAULT '',
+  autor_cargo TEXT DEFAULT '',
   estilo TEXT DEFAULT '',
   notas_estilo TEXT DEFAULT '',
   prompt_imagen TEXT DEFAULT '', -- prompt base editable, usado por cada pieza de Contenido
@@ -98,6 +101,9 @@ CREATE TABLE IF NOT EXISTS identidad_visual (
 
 -- Por si la tabla ya existia de un deploy anterior a que se agregara prompt_imagen.
 ALTER TABLE identidad_visual ADD COLUMN IF NOT EXISTS prompt_imagen TEXT DEFAULT '';
+ALTER TABLE identidad_visual ADD COLUMN IF NOT EXISTS autor_foto TEXT;
+ALTER TABLE identidad_visual ADD COLUMN IF NOT EXISTS autor_nombre TEXT DEFAULT '';
+ALTER TABLE identidad_visual ADD COLUMN IF NOT EXISTS autor_cargo TEXT DEFAULT '';
 
 -- Sin uso activo (ver nota arriba) — se deja creada por si ya tiene datos de un deploy
 -- anterior, no se borra.
@@ -130,6 +136,8 @@ CREATE TABLE IF NOT EXISTS contenido_generado (
   semana INTEGER,
   canal TEXT NOT NULL,
   formato TEXT DEFAULT '', -- Post/Feed/Reels/Story segun el canal (ver planes_marketing.canales) — define la proporcion de la imagen
+  imagenes_carrusel JSONB DEFAULT '[]', -- array de data URIs: si tiene mas de 1, la pieza es un carrusel (varios slides con el mismo color, ver lib/imagenPieza.js crearCarrusel) en vez de una imagen unica (imagen_ref)
+  usa_video BOOLEAN NOT NULL DEFAULT false, -- true = esta pieza lleva un video (reutilizado de campañas de Meta, etc.) en vez de imagen — el video se sube a mano directo en Metricool, la app no lo genera ni lo guarda
   fecha_programada DATE,
   pilar TEXT,
   copy TEXT,
@@ -152,6 +160,8 @@ ALTER TABLE contenido_generado ADD COLUMN IF NOT EXISTS bajada_imagen TEXT DEFAU
 ALTER TABLE contenido_generado ADD COLUMN IF NOT EXISTS programado_en TIMESTAMPTZ;
 ALTER TABLE contenido_generado ADD COLUMN IF NOT EXISTS metricool_post_id TEXT;
 ALTER TABLE contenido_generado ADD COLUMN IF NOT EXISTS formato TEXT DEFAULT '';
+ALTER TABLE contenido_generado ADD COLUMN IF NOT EXISTS imagenes_carrusel JSONB DEFAULT '[]';
+ALTER TABLE contenido_generado ADD COLUMN IF NOT EXISTS usa_video BOOLEAN NOT NULL DEFAULT false;
 
 -- contenido_linkedin: Pantalla 3b. Mensajes directos (1 a 1, sin imagen) y artículos/posts
 -- de LinkedIn (con imagen, mismo mecanismo que contenido_generado) para prospección

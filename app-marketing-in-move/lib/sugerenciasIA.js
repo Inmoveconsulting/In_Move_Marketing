@@ -245,6 +245,60 @@ Respondé con este JSON exacto, sin nada más alrededor:
   };
 }
 
+// Carrusel — guion de varios slides (titular+bajada cada uno) que en conjunto cuentan una
+// historia/argumento en secuencia, no una lista de titulares sueltos. Cada slide se
+// compone después con lib/imagenPieza.js crearCarrusel, mismo layout de tarjeta personal
+// pero con el mismo color en las N slides (para que se vea como una sola pieza).
+async function sugerirCarrusel({ perfil, pilar, copy }) {
+  const system =
+    'Sos un copywriter B2B experto en carruseles de LinkedIn/Instagram que cuentan una historia en varias slides. Escribís en español. Respondés ÚNICAMENTE con JSON válido, sin texto extra antes o después, sin bloques de código.';
+
+  const prompt = `
+TONO DE VOZ DE LA MARCA:
+${perfil.tono_voz}
+
+FRASES Y CONCEPTOS GUÍA (usalos si calzan naturalmente):
+${perfil.frases_guia}
+
+PILAR DE CONTENIDO: ${pilar.pilar}
+${pilar.descripcion}
+
+COPY COMPLETO DE ESTA PIEZA (el carrusel desarrolla la misma idea, en pasos — no lo repitas
+literal, y no hace falta cubrir todo el copy palabra por palabra):
+${copy}
+
+Tarea: armá el guion de un carrusel de 5 a 7 slides que cuenten una historia/argumento EN
+SECUENCIA — no una lista de tips sueltos sin conexión. Estructura sugerida:
+1. Slide 1: el gancho — el problema o la afirmación que engancha, planteado como pregunta
+   o tensión.
+2. Slides intermedios: desarrollan la idea paso a paso, cada uno construye sobre el
+   anterior (causa, evidencia, matiz, ejemplo concreto).
+3. Último slide: la conclusión o el llamado a la acción, que cierra la idea.
+
+Cada slide tiene:
+- "titular": la idea de ese paso, corta y contundente. Máximo 8 palabras. Sin punto final.
+- "bajada": una sola oración que aterriza esa idea. Máximo 14 palabras.
+
+Evidencia sobre promesa, directo, sin relleno, como pide el tono de marca. Que se entienda
+la secuencia leyendo solo los titulares en orden, aunque alguien no lea las bajadas.
+
+Respondé con este JSON exacto, sin nada más alrededor, entre 5 y 7 elementos en "slides":
+{"slides": [{"titular": "<máximo 8 palabras>", "bajada": "<máximo 14 palabras>"}]}
+`.trim();
+
+  // 7 slides x 2 campos cortos cada uno — con margen para perfiles densos, mismo motivo
+  // que el resto de las funciones de este archivo.
+  const { text, stopReason } = await askClaude({ system, prompt, maxTokens: 2200 });
+  const resultado = extractJson(text, { stopReason });
+  const slides = Array.isArray(resultado.slides) ? resultado.slides : [];
+  return slides
+    .map((s) => ({
+      titular: (s.titular || '').trim().replace(/^["']|["']$/g, ''),
+      bajada: (s.bajada || '').trim().replace(/^["']|["']$/g, ''),
+    }))
+    .filter((s) => s.titular);
+}
+
 // Pantalla 3b — copy para mensajes directos de LinkedIn (1 a 1, prospección puntual) o
 // artículos/posts de LinkedIn, según "tema" (elegido de una lista) + "contexto" (texto
 // libre: quién es el prospecto, o de qué trata puntualmente el artículo). Distinto de
@@ -319,5 +373,6 @@ module.exports = {
   sugerirCalendario,
   sugerirCopy,
   sugerirTitularYBajada,
+  sugerirCarrusel,
   sugerirCopyLinkedin,
 };

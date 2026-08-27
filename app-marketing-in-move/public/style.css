@@ -297,6 +297,22 @@ textarea:focus {
   margin-right: 8px;
 }
 
+/* Carrusel (Pantalla 3) — fila horizontal con scroll, así se ven las slides en orden sin
+   que la tarjeta de la pieza se estire de alto. */
+.carrusel-scroll {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  margin: 8px 0;
+}
+
+.carrusel-scroll .identidad-thumb {
+  flex: 0 0 auto;
+  max-width: 140px;
+  margin: 0;
+}
+
 .intentos-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));

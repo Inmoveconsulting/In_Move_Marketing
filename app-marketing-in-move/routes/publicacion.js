@@ -90,6 +90,27 @@ router.get('/imagen/:origen/:id.png', async (req, res, next) => {
   }
 });
 
+// Igual que /imagen/:origen/:id.png pero para una slide puntual de un carrusel (solo
+// contenido_generado tiene carruseles por ahora, ver contenido_generado.imagenes_carrusel
+// — de ahí que no reciba :origen, siempre es esa tabla).
+router.get('/imagen-carrusel/:id/:indice.png', async (req, res, next) => {
+  try {
+    const { rows } = await pool.query('SELECT imagenes_carrusel FROM contenido_generado WHERE id = $1', [
+      req.params.id,
+    ]);
+    const imagenes = (rows[0] && rows[0].imagenes_carrusel) || [];
+    const dataUri = imagenes[parseInt(req.params.indice, 10)];
+    if (!dataUri) return res.status(404).send('Slide no encontrada.');
+    const match = /^data:(.+?);base64,(.*)$/s.exec(dataUri);
+    if (!match) return res.status(500).send('Imagen guardada en un formato inválido.');
+    res.set('Content-Type', match[1]);
+    res.set('Cache-Control', 'public, max-age=3600');
+    res.send(Buffer.from(match[2], 'base64'));
+  } catch (err) {
+    next(err);
+  }
+});
+
 // Mapa de nuestro "formato" interno al postType que espera Metricool para Instagram —
 // visto en su propio editor de publicaciones (captura de la usuaria, 25-ago-2026): el
 // selector junto al ícono de Instagram ofrece "Post" (imagen o carrusel), "Reel" (video),
@@ -240,8 +261,19 @@ router.post('/pieza/:origen/:id/programar', async (req, res, next) => {
     }
     const fechaHoraIso = `${fecha}T${hora}:00`;
 
+    // Si la pieza es un carrusel (imagenes_carrusel con más de una slide), se normaliza
+    // cada slide por separado y se mandan todas — si no, es el caso de siempre, una sola
+    // imagen (o ninguna).
     let imagenes = [];
-    if (pieza.imagen_ref) {
+    const esCarrusel = origen !== 'linkedin' && pieza.imagenes_carrusel && pieza.imagenes_carrusel.length > 0;
+    if (esCarrusel) {
+      for (let i = 0; i < pieza.imagenes_carrusel.length; i += 1) {
+        const urlSlide = `https://${req.get('host')}/productos/${req.producto.slug}/publicacion/imagen-carrusel/${pieza.id}/${i}.png`;
+        // eslint-disable-next-line no-await-in-loop
+        const normalizada = await normalizarImagen(urlSlide);
+        imagenes.push(normalizada);
+      }
+    } else if (pieza.imagen_ref) {
       const urlImagen = `https://${req.get('host')}/productos/${req.producto.slug}/publicacion/imagen/${origen}/${pieza.id}.png`;
       const normalizada = await normalizarImagen(urlImagen);
       imagenes = [normalizada];
