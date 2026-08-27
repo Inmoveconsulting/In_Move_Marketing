@@ -202,18 +202,32 @@ function construirTarjetaPersonalSvg({ titular, bajada, ancho, alto, colores, co
   const lineasTitular = envolverTexto(titular, 20, 4);
   const lineasBajada = bajada ? envolverTexto(bajada, 34, 3) : [];
 
-  const yTexto = logoBoxY + logoBoxH + Math.round(h * 0.07);
+  const gapTitularBajada = Math.round(h * 0.025);
+  const fotoDiam = Math.round(w * 0.11);
+  const firmaY = h - Math.round(h * 0.13);
+
+  // Centrado vertical del bloque de texto en el espacio libre entre el logo y la firma —
+  // en formatos cuadrados casi no se nota, pero en verticales (Story/Reel, mucho más alto
+  // que ancho) pegar el texto justo debajo del logo dejaba un vacío enorme antes de la
+  // firma y se veía desequilibrado (encontrado por la usuaria con una pieza real).
+  const alturaBloqueTexto =
+    lineasTitular.length * interlineadoTitular + (lineasBajada.length ? gapTitularBajada + lineasBajada.length * interlineadoBajada : 0);
+  const espacioTop = logoBoxY + logoBoxH;
+  const espacioBottom = firmaY;
+  const yTexto = Math.max(
+    espacioTop + Math.round(h * 0.04),
+    Math.round(espacioTop + (espacioBottom - espacioTop - alturaBloqueTexto) / 2)
+  );
+
   const titularSvg = lineasTitular
     .map((linea, i) => `<tspan x="${paddingX}" dy="${i === 0 ? 0 : interlineadoTitular}">${escaparXml(linea)}</tspan>`)
     .join('');
 
-  const yBajada = yTexto + lineasTitular.length * interlineadoTitular + Math.round(h * 0.025);
+  const yBajada = yTexto + lineasTitular.length * interlineadoTitular + gapTitularBajada;
   const bajadaSvg = lineasBajada
     .map((linea, i) => `<tspan x="${paddingX}" dy="${i === 0 ? 0 : interlineadoBajada}">${escaparXml(linea)}</tspan>`)
     .join('');
 
-  const fotoDiam = Math.round(w * 0.11);
-  const firmaY = h - Math.round(h * 0.13);
   const firmaTextoX = paddingX + fotoDiam + Math.round(w * 0.03);
   const nombreTam = Math.round(w * 0.028);
   const cargoTam = Math.round(w * 0.023);
