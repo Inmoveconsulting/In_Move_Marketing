@@ -115,9 +115,19 @@ async function programarPost({ texto, fechaHoraIso, timezone, providers, imagene
 // Devuelven el array de posts tal cual lo manda Metricool (sin transformar campos), para
 // no perder información — routes/resultados.js decide qué mostrar.
 
+// Metricool exige fecha+hora completa (yyyy-MM-dd'T'HH:mm:ss), no solo la fecha — primer
+// intento real (4-sept-2026) lo confirmó con un error 400 bien claro. from arranca a las
+// 00:00:00 del día, to termina a las 23:59:59, así el rango cubre el día completo.
+function inicioDelDia(fecha) {
+  return `${fecha}T00:00:00`;
+}
+function finDelDia(fecha) {
+  return `${fecha}T23:59:59`;
+}
+
 async function obtenerAnaliticaInstagram({ from, to }) {
   const { token, userId, blogId } = credenciales();
-  const url = `${BASE}/v2/analytics/posts/instagram?from=${from}&to=${to}&userId=${userId}&blogId=${blogId}`;
+  const url = `${BASE}/v2/analytics/posts/instagram?from=${inicioDelDia(from)}&to=${finDelDia(to)}&userId=${userId}&blogId=${blogId}`;
   const res = await fetch(url, { headers: headersAuth(token) });
   const bodyText = await res.text();
   if (!res.ok) {
@@ -134,7 +144,7 @@ async function obtenerAnaliticaInstagram({ from, to }) {
 
 async function obtenerAnaliticaLinkedin({ from, to }) {
   const { token, userId, blogId } = credenciales();
-  const url = `${BASE}/stats/linkedin/posts?start=${from}&end=${to}&userId=${userId}&blogId=${blogId}`;
+  const url = `${BASE}/stats/linkedin/posts?start=${inicioDelDia(from)}&end=${finDelDia(to)}&userId=${userId}&blogId=${blogId}`;
   const res = await fetch(url, { headers: headersAuth(token) });
   const bodyText = await res.text();
   if (!res.ok) {

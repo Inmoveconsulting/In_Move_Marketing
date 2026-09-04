@@ -13,11 +13,16 @@
 
 <p class="field-help">
   Primera versión: trae las métricas reales de Instagram y LinkedIn para el rango de
-  fechas elegido, tal cual las devuelve Metricool. Todavía no las empareja automáticamente
-  con tus piezas — comparalas a ojo por el texto/fecha. El motor de recomendación (qué
-  ajustar, cuándo cambiar de objetivo) se suma en un segundo paso, una vez que confirmemos
-  que estos números llegan bien.
+  fechas elegido. Como Talent y Readiness hoy comparten una sola cuenta de Metricool, se
+  filtra para mostrar solo lo que coincide con el texto de las piezas de <strong><%= producto.nombre %></strong>
+  — no es 100% infalible (depende de que el texto no se haya alterado mucho). El motor de
+  recomendación (qué ajustar, cuándo cambiar de objetivo) se suma en un segundo paso, una
+  vez que confirmemos que estos números llegan bien.
 </p>
+
+<% if (totalExcluidos > 0) { %>
+  <p class="muted small">(<%= totalExcluidos %> resultado(s) de Metricool no coincidieron con ninguna pieza de este producto — probablemente sean del otro producto, o texto que cambió demasiado para reconocerlo.)</p>
+<% } %>
 
 <form method="GET" action="/productos/<%= producto.slug %>/resultados" class="cta-fila" style="grid-template-columns:1fr 1fr auto; max-width:480px;">
   <input type="date" name="desde" value="<%= desde %>">
