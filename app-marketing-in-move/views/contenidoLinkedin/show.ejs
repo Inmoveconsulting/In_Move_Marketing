@@ -76,6 +76,21 @@
     </section>
   </div>
 
+  <% if (piezasResueltas.length > 0) { %>
+    <details class="aprobadas-checklist" open>
+      <summary>✓ Ya resueltas (<%= piezasResueltas.length %>)</summary>
+      <ul>
+        <% piezasResueltas.forEach(function (p) { %>
+          <li>
+            <span class="check-verde">✓</span>
+            <%= p.tipo === 'mensaje' ? 'Mensaje directo' : 'Artículo' %> · <%= p.tema %>
+            <span class="muted small">— <%= p.estado === 'publicado' ? 'publicado a mano' : 'programado' %>, <%= new Date(p.actualizado_en).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) %></span>
+          </li>
+        <% }); %>
+      </ul>
+    </details>
+  <% } %>
+
   <% if (piezas.length > 0) { %>
     <h2 class="section-title">Piezas generadas</h2>
     <div class="piezas-grid">
@@ -121,6 +136,12 @@
               <input type="file" name="imagen" accept="image/*">
               <div class="form-actions">
                 <button type="submit">O subir la mía</button>
+              </div>
+            </form>
+
+            <form method="POST" action="/productos/<%= producto.slug %>/linkedin/pieza/<%= p.id %>/publicado">
+              <div class="form-actions">
+                <button type="submit" class="btn-primary">✓ Ya lo subí a mano — marcar como publicado</button>
               </div>
             </form>
           <% } %>

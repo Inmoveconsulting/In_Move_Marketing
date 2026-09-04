@@ -120,10 +120,16 @@ router.get('/imagen-carrusel/:id/:indice.png', async (req, res, next) => {
 // mostrar la forma real esperada; ajustar acá con ese dato, no adivinar de nuevo a ciegas.
 const POST_TYPE_INSTAGRAM = { Feed: 'POST', Reels: 'REEL', Story: 'STORY' };
 
+// Igual que POST_TYPE_INSTAGRAM: activa el toggle "Contenido generado por IA" de la
+// sección "Configuración de Instagram" del editor de Metricool (captura de la usuaria,
+// 25-ago-2026), para que quede declarado en cada publicación que se manda desde acá — el
+// nombre real del campo en la API no está confirmado, es una estimación (aiGenerated).
 function construirProvider(canal, formato) {
   const network = canal.toLowerCase();
-  if (network === 'instagram' && POST_TYPE_INSTAGRAM[formato]) {
-    return { network, postType: POST_TYPE_INSTAGRAM[formato] };
+  if (network === 'instagram') {
+    const provider = { network, aiGenerated: true };
+    if (POST_TYPE_INSTAGRAM[formato]) provider.postType = POST_TYPE_INSTAGRAM[formato];
+    return provider;
   }
   return { network };
 }

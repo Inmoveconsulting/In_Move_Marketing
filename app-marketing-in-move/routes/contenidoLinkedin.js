@@ -172,6 +172,7 @@ router.get('/', async (req, res, next) => {
         producto: req.producto,
         perfilAprobado: null,
         piezas: [],
+        piezasResueltas: [],
         temasMensaje: TEMAS_MENSAJE,
         temasArticulo: TEMAS_ARTICULO,
         hayIdentidad: false,
@@ -179,8 +180,20 @@ router.get('/', async (req, res, next) => {
       });
     }
 
+    // Separado en pendientes vs. ya resueltas (programado = se programó solo desde
+    // Publicación; publicado = la usuaria lo subió a mano en Metricool y lo marcó acá) —
+    // antes se mostraban todas juntas para siempre y se iban acumulando sin forma de
+    // sacarlas de la vista principal.
     const { rows: piezas } = await pool.query(
-      `SELECT * FROM contenido_linkedin WHERE producto_id = $1 ORDER BY id DESC`,
+      `SELECT * FROM contenido_linkedin
+       WHERE producto_id = $1 AND estado NOT IN ('programado', 'publicado')
+       ORDER BY id DESC`,
+      [req.producto.id]
+    );
+    const { rows: piezasResueltas } = await pool.query(
+      `SELECT * FROM contenido_linkedin
+       WHERE producto_id = $1 AND estado IN ('programado', 'publicado')
+       ORDER BY actualizado_en DESC`,
       [req.producto.id]
     );
     const identidad = await getIdentidadVisualAprobadaActual(req.producto.id);
@@ -189,6 +202,7 @@ router.get('/', async (req, res, next) => {
       producto: req.producto,
       perfilAprobado,
       piezas,
+      piezasResueltas,
       temasMensaje: TEMAS_MENSAJE,
       temasArticulo: TEMAS_ARTICULO,
       hayIdentidad: !!identidad,
@@ -343,6 +357,23 @@ router.post('/pieza/:id/imagen', upload.single('imagen'), async (req, res, next)
     res.redirect(
       `/productos/${req.producto.slug}/linkedin?error=${encodeURIComponent(err.message)}`
     );
+  }
+});
+
+// Marcar un artículo como publicado a mano en Metricool — a diferencia de Contenido
+// (Pantalla 3), estos artículos no pasan por la Pantalla 5 de forma automática siempre;
+// cuando la usuaria los sube directo en el planificador de Metricool, este botón es lo
+// que saca la pieza de la lista de pendientes (sin esto, se quedaban acumuladas ahí para
+// siempre sin ninguna forma de marcarlas como resueltas).
+router.post('/pieza/:id/publicado', async (req, res, next) => {
+  try {
+    await pool.query(
+      `UPDATE contenido_linkedin SET estado = 'publicado', actualizado_en = now() WHERE id = $1`,
+      [req.params.id]
+    );
+    res.redirect(`/productos/${req.producto.slug}/linkedin`);
+  } catch (err) {
+    next(err);
   }
 });
 

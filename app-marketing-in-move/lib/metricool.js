@@ -98,4 +98,59 @@ async function programarPost({ texto, fechaHoraIso, timezone, providers, imagene
   }
 }
 
-module.exports = { normalizarImagen, programarPost };
+// Analíticas por posteo — Pantalla 6 (Resultados). Investigado directo del swagger real
+// de Metricool (https://app.metricool.com/api/swagger.json, 4-sept-2026), no adivinado:
+//
+// - Instagram: GET /v2/analytics/posts/instagram?from=YYYY-MM-DD&to=YYYY-MM-DD — devuelve
+//   JSON real: {data: [{postId, publishedAt, content, likes, comments, shares,
+//   interactions, engagement, reach, saved, impressions, views, ...}]}.
+// - LinkedIn: la versión nueva (/v2/analytics/posts/linkedin) solo devuelve un CSV para
+//   descargar, no sirve para leer por código. Se usa la versión vieja
+//   (/stats/linkedin/posts), que sí devuelve JSON — pero sus parámetros no estaban
+//   documentados en el swagger (parameters: [] vacío ahí), así que se prueba con
+//   start/end (mismo patrón que otros endpoints legacy de la API) de forma defensiva: si
+//   Metricool devuelve otra cosa, el error muestra la respuesta cruda para ajustar rápido,
+//   no hace falta adivinar dos veces.
+//
+// Devuelven el array de posts tal cual lo manda Metricool (sin transformar campos), para
+// no perder información — routes/resultados.js decide qué mostrar.
+
+async function obtenerAnaliticaInstagram({ from, to }) {
+  const { token, userId, blogId } = credenciales();
+  const url = `${BASE}/v2/analytics/posts/instagram?from=${from}&to=${to}&userId=${userId}&blogId=${blogId}`;
+  const res = await fetch(url, { headers: headersAuth(token) });
+  const bodyText = await res.text();
+  if (!res.ok) {
+    throw new Error(`Metricool no pudo traer las analíticas de Instagram (status ${res.status}): ${bodyText.slice(0, 500)}`);
+  }
+  let data;
+  try {
+    data = JSON.parse(bodyText);
+  } catch (err) {
+    throw new Error(`Metricool devolvió una respuesta inesperada en analíticas de Instagram: ${bodyText.slice(0, 500)}`);
+  }
+  return (data && data.data) || [];
+}
+
+async function obtenerAnaliticaLinkedin({ from, to }) {
+  const { token, userId, blogId } = credenciales();
+  const url = `${BASE}/stats/linkedin/posts?start=${from}&end=${to}&userId=${userId}&blogId=${blogId}`;
+  const res = await fetch(url, { headers: headersAuth(token) });
+  const bodyText = await res.text();
+  if (!res.ok) {
+    throw new Error(`Metricool no pudo traer las analíticas de LinkedIn (status ${res.status}): ${bodyText.slice(0, 500)}`);
+  }
+  let data;
+  try {
+    data = JSON.parse(bodyText);
+  } catch (err) {
+    throw new Error(`Metricool devolvió una respuesta inesperada en analíticas de LinkedIn: ${bodyText.slice(0, 500)}`);
+  }
+  // Puede venir como array directo, o envuelto en {data: [...]} como Instagram — se
+  // acepta cualquiera de las dos formas sin asumir cuál es.
+  if (Array.isArray(data)) return data;
+  if (data && Array.isArray(data.data)) return data.data;
+  return [];
+}
+
+module.exports = { normalizarImagen, programarPost, obtenerAnaliticaInstagram, obtenerAnaliticaLinkedin };

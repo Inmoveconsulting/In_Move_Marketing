@@ -1,0 +1,84 @@
+<%- include('../partials/header') %>
+
+<div class="perfil-header">
+  <div>
+    <h1>Resultados</h1>
+    <span class="muted small">Métricas reales de Metricool — v1, sin recomendación automática todavía</span>
+  </div>
+</div>
+
+<% if (error) { %>
+  <p class="callout callout-error"><%= error %></p>
+<% } %>
+
+<p class="field-help">
+  Primera versión: trae las métricas reales de Instagram y LinkedIn para el rango de
+  fechas elegido, tal cual las devuelve Metricool. Todavía no las empareja automáticamente
+  con tus piezas — comparalas a ojo por el texto/fecha. El motor de recomendación (qué
+  ajustar, cuándo cambiar de objetivo) se suma en un segundo paso, una vez que confirmemos
+  que estos números llegan bien.
+</p>
+
+<form method="GET" action="/productos/<%= producto.slug %>/resultados" class="cta-fila" style="grid-template-columns:1fr 1fr auto; max-width:480px;">
+  <input type="date" name="desde" value="<%= desde %>">
+  <input type="date" name="hasta" value="<%= hasta %>">
+  <button type="submit">Ver</button>
+</form>
+
+<section class="plan-section">
+  <h2>LinkedIn (<%= linkedin.length %>)</h2>
+  <% if (linkedin.length === 0) { %>
+    <p class="callout">Sin datos de LinkedIn en este rango.</p>
+  <% } else { %>
+    <div style="overflow-x:auto">
+      <table class="table">
+        <thead>
+          <tr><th>Fecha</th><th>Texto/título</th><th>Likes</th><th>Comentarios</th><th>Shares</th><th>Impresiones</th><th>Engagement</th></tr>
+        </thead>
+        <tbody>
+          <% linkedin.forEach(function (p) { %>
+            <tr>
+              <td class="muted small"><%= p.created && p.created.dateTime ? new Date(p.created.dateTime).toLocaleDateString('es-AR') : '—' %></td>
+              <td class="truncate"><%= p.title || p.description || p.comment || '—' %></td>
+              <td><%= p.likes ?? '—' %></td>
+              <td><%= p.comments ?? '—' %></td>
+              <td><%= p.shares ?? '—' %></td>
+              <td><%= p.impressions ?? '—' %></td>
+              <td><%= p.engagement ?? '—' %></td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</section>
+
+<section class="plan-section">
+  <h2>Instagram (<%= instagram.length %>)</h2>
+  <% if (instagram.length === 0) { %>
+    <p class="callout">Sin datos de Instagram en este rango.</p>
+  <% } else { %>
+    <div style="overflow-x:auto">
+      <table class="table">
+        <thead>
+          <tr><th>Fecha</th><th>Tipo</th><th>Texto</th><th>Likes</th><th>Comentarios</th><th>Alcance</th><th>Engagement</th></tr>
+        </thead>
+        <tbody>
+          <% instagram.forEach(function (p) { %>
+            <tr>
+              <td class="muted small"><%= p.publishedAt && p.publishedAt.dateTime ? new Date(p.publishedAt.dateTime).toLocaleDateString('es-AR') : '—' %></td>
+              <td class="muted small"><%= p.type || '—' %></td>
+              <td class="truncate"><%= p.content || '—' %></td>
+              <td><%= p.likes ?? '—' %></td>
+              <td><%= p.comments ?? '—' %></td>
+              <td><%= p.reach ?? '—' %></td>
+              <td><%= p.engagement ?? '—' %></td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</section>
+
+<%- include('../partials/footer') %>
