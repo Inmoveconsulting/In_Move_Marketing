@@ -327,6 +327,12 @@ router.post('/nueva-version', async (req, res, next) => {
       return res.redirect(`/productos/${req.producto.slug}/plan`);
     }
     const nuevaVersion = actual.version + 1;
+    // La versión nueva se ata al perfil aprobado VIGENTE, no al que tenía la versión
+    // anterior. Antes copiaba actual.perfil_producto_id, así que si el perfil se
+    // actualizaba (ej: objetivo de marca -> leads) y después se editaba el plan, el plan
+    // nuevo seguía generando contenido con el perfil viejo sin avisar.
+    const perfilVigente = await getPerfilAprobadoActual(req.producto.id);
+    const perfilId = (perfilVigente && perfilVigente.id) || actual.perfil_producto_id;
     await pool.query(
       `INSERT INTO planes_marketing
         (producto_id, perfil_producto_id, version, estado, objetivo, duracion_dias,
@@ -334,7 +340,7 @@ router.post('/nueva-version', async (req, res, next) => {
        VALUES ($1, $2, $3, 'borrador', $4, $5, $6, $7, $8, $9, $10)`,
       [
         req.producto.id,
-        actual.perfil_producto_id,
+        perfilId,
         nuevaVersion,
         actual.objetivo,
         actual.duracion_dias,
