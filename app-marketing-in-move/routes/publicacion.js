@@ -238,7 +238,13 @@ async function resolverLinkCta(pieza) {
     ctas = [];
   }
   const cta = ctas.find((c) => c.nombre === nombreCta);
-  return (cta && cta.destino) || null;
+  if (cta && cta.destino) return cta.destino;
+
+  // Si el CTA del plan es una frase con el link adentro (ej. "Consultanos por tu próxima
+  // búsqueda: https://talent.inmoveconsulting.com"), se usa ese link — así no depende de
+  // haber cargado el CTA estructurado en el perfil.
+  const enFrase = String(nombreCta).match(/https?:\/\/[^\s)]+/);
+  return enFrase ? enFrase[0].replace(/[.,;:]+$/, '') : null;
 }
 
 router.post('/pieza/:origen/:id/programar', async (req, res, next) => {
@@ -291,7 +297,8 @@ router.post('/pieza/:origen/:id/programar', async (req, res, next) => {
     let texto = pieza.copy;
     if (origen !== 'linkedin') {
       const linkCta = await resolverLinkCta(pieza);
-      if (linkCta) {
+      // No se duplica el link si la IA ya lo incluyó en el copy.
+      if (linkCta && !pieza.copy.includes(linkCta.replace(/\/$/, ''))) {
         texto = `${pieza.copy}\n\n${linkCta}`;
       }
     }

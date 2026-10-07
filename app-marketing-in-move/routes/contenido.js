@@ -9,9 +9,9 @@ const {
   getPerfilPorId,
   getIdentidadVisualAprobadaActual,
 } = require('../lib/queries');
-const { sugerirCopy, sugerirTitularYBajada, sugerirCarrusel } = require('../lib/sugerenciasIA');
+const { sugerirCopy, sugerirTitularYBajada, sugerirCarrusel, sugerirGraficoLead } = require('../lib/sugerenciasIA');
 const { generarFondoImagen } = require('../lib/openaiImagenes');
-const { crearImagenPieza, crearTarjetaPersonal, crearCarrusel } = require('../lib/imagenPieza');
+const { crearImagenPieza, crearTarjetaPersonal, crearCarrusel, crearGraficoLead } = require('../lib/imagenPieza');
 
 // Pantalla 3 — Generación de contenido. Se genera por tramo (semana), no el plan completo
 // de una (regla de la spec). El pilar de cada semana rota sobre el calendario del plan.
@@ -549,6 +549,69 @@ router.post('/pieza/:id/carrusel', async (req, res, next) => {
   } catch (err) {
     res.redirect(
       `/productos/${req.producto.slug}/contenido?error=${encodeURIComponent('No se pudo crear el carrusel: ' + err.message)}`
+    );
+  }
+});
+
+// Gráfico de la campaña de leads — composición armada por código (sin costo de IA de
+// imágenes): "dos_partes" (lo que vemos / lo que necesitamos conocer) o "tres_momentos"
+// (un caso en tres pasos). La IA solo escribe el texto; no inventa cifras ni casos.
+router.post('/pieza/:id/grafico', async (req, res, next) => {
+  try {
+    const tipo = req.body.tipo === 'tres_momentos' ? 'tres_momentos' : 'dos_partes';
+    const { rows } = await pool.query('SELECT * FROM contenido_generado WHERE id = $1', [req.params.id]);
+    const pieza = rows[0];
+    if (!pieza || CANALES_SIN_IMAGEN.includes(pieza.canal)) {
+      return res.redirect(`/productos/${req.producto.slug}/contenido`);
+    }
+
+    const identidad = await getIdentidadVisualAprobadaActual(req.producto.id);
+    if (!identidad) {
+      return res.redirect(
+        `/productos/${req.producto.slug}/contenido?error=${encodeURIComponent('Necesitás aprobar Identidad visual antes de crear un gráfico.')}`
+      );
+    }
+
+    const { rows: planRows } = await pool.query('SELECT * FROM planes_marketing WHERE id = $1', [
+      pieza.plan_marketing_id,
+    ]);
+    const plan = planRows[0];
+    const perfil = await getPerfilPorId(pieza.perfil_producto_id);
+    const pilarObj = (plan.calendario || []).find((p) => p.pilar === pieza.pilar) || {
+      pilar: pieza.pilar,
+      descripcion: '',
+    };
+
+    const datos = await sugerirGraficoLead({ perfil, pilar: pilarObj, copy: pieza.copy, tipo });
+    if (!datos) {
+      return res.redirect(
+        `/productos/${req.producto.slug}/contenido?error=${encodeURIComponent('La IA no devolvió un texto utilizable para el gráfico — probá de nuevo.')}`
+      );
+    }
+
+    const { ancho, alto } = dimensionesDe(pieza.canal, pieza.formato);
+    const imagen = await crearGraficoLead({
+      tipo,
+      datos,
+      logoDataUri: identidad.logo,
+      autorFotoDataUri: identidad.autor_foto,
+      autorNombre: identidad.autor_nombre,
+      autorCargo: identidad.autor_cargo,
+      ancho,
+      alto,
+    });
+
+    await pool.query(
+      `UPDATE contenido_generado SET
+         imagen_ref = $1, imagenes_carrusel = '[]', texto_imagen = $2, bajada_imagen = '',
+         actualizado_en = now()
+       WHERE id = $3`,
+      [imagen, datos.titulo, pieza.id]
+    );
+    res.redirect(`/productos/${req.producto.slug}/contenido#pieza-${pieza.id}`);
+  } catch (err) {
+    res.redirect(
+      `/productos/${req.producto.slug}/contenido?error=${encodeURIComponent('No se pudo crear el gráfico: ' + err.message)}`
     );
   }
 });

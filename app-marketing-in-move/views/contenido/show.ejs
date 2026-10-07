@@ -102,6 +102,16 @@
                       </div>
                     </form>
 
+                    <p class="muted small" style="margin-top:10px">Gráficos para leads (sin costo de IA de imágenes):</p>
+                    <form method="POST" action="/productos/<%= producto.slug %>/contenido/pieza/<%= p.id %>/grafico">
+                      <input type="hidden" name="tipo" value="dos_partes">
+                      <div class="form-actions"><button type="submit">Gráfico: lo que vemos / lo que necesitamos conocer</button></div>
+                    </form>
+                    <form method="POST" action="/productos/<%= producto.slug %>/contenido/pieza/<%= p.id %>/grafico">
+                      <input type="hidden" name="tipo" value="tres_momentos">
+                      <div class="form-actions"><button type="submit">Gráfico: un caso en tres momentos</button></div>
+                    </form>
+
                     <% if (!['Reels', 'Story'].includes(p.formato)) { %>
                       <form method="POST" action="/productos/<%= producto.slug %>/contenido/pieza/<%= p.id %>/carrusel">
                         <div class="form-actions">

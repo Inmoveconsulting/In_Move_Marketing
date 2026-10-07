@@ -299,6 +299,88 @@ Respondé con este JSON exacto, sin nada más alrededor, entre 5 y 7 elementos e
     .filter((s) => s.titular);
 }
 
+// Gráficos de la campaña de leads — contenido de texto para dos composiciones armadas por
+// código (lib/imagenPieza.js crearGraficoLead):
+//   - "dos_partes": "Lo que vemos" vs "Lo que necesitamos conocer" (el criterio del análisis).
+//   - "tres_momentos": un caso en tres pasos (necesidad → análisis → información aportada).
+// Regla dura: NO inventar cifras, clientes ni resultados. Solo se puede usar lo que figura
+// en "ejemplos de referencia" del perfil; si no, el caso es hipotético y se marca como tal.
+async function sugerirGraficoLead({ perfil, pilar, copy, tipo }) {
+  const system =
+    'Sos un copywriter B2B que escribe textos muy breves para gráficos. Escribís en español rioplatense neutro. Respondés ÚNICAMENTE con JSON válido, sin texto extra antes o después, sin bloques de código.';
+
+  const reglas = `
+REGLAS DURAS:
+- No inventes cifras, porcentajes, nombres de clientes ni resultados. Solo podés usar datos
+  que aparezcan textualmente en los EJEMPLOS DE REFERENCIA de abajo.
+- Poco texto: cada frase es corta y se entiende de un vistazo.
+- Tono de la marca: directo, evidencia sobre promesa, sin relleno.`.trim();
+
+  const contexto = `
+TONO DE VOZ DE LA MARCA:
+${perfil.tono_voz}
+
+EJEMPLOS DE REFERENCIA (única fuente permitida de datos y casos reales):
+${perfil.ejemplos_referencia}
+
+PILAR DE CONTENIDO: ${pilar.pilar}
+${pilar.descripcion}
+
+COPY DE ESTA PIEZA (el gráfico acompaña la misma idea, no la repite literal):
+${copy}`.trim();
+
+  let prompt;
+  if (tipo === 'tres_momentos') {
+    prompt = `
+${contexto}
+
+${reglas}
+
+Tarea: armá un caso en TRES momentos para un gráfico.
+- "titular": la idea del caso en máximo 9 palabras, sin punto final.
+- "hipotetico": true si el caso NO sale textualmente de los ejemplos de referencia (situación
+  ilustrativa); false solo si es un caso real de los ejemplos de referencia, sin agregarle nada.
+- "pasos": exactamente 3 frases, máximo 14 palabras cada una, en este orden:
+  1) la necesidad que tenía la empresa, 2) qué analizamos, 3) qué información le aportamos
+  para decidir. Si es hipotético, sin cifras.
+
+Respondé con este JSON exacto:
+{"titulo": "<máx 9 palabras>", "hipotetico": true, "pasos": ["<paso 1>", "<paso 2>", "<paso 3>"]}
+`.trim();
+  } else {
+    prompt = `
+${contexto}
+
+${reglas}
+
+Tarea: armá un gráfico en dos partes: qué se ve a simple vista en una contratación (hoja de
+vida, entrevista, impresión) vs. qué hace falta conocer para decidir bien (lo que no se ve).
+- "titulo": la idea en máximo 9 palabras, sin punto final.
+- "izquierda": entre 2 y 3 frases de máximo 7 palabras, lo que se ve.
+- "derecha": entre 2 y 3 frases de máximo 7 palabras, lo que hay que conocer. Que cada una
+  responda o complete a la de la izquierda en el mismo orden.
+
+Respondé con este JSON exacto:
+{"titulo": "<máx 9 palabras>", "izquierda": ["<frase>", "<frase>"], "derecha": ["<frase>", "<frase>"]}
+`.trim();
+  }
+
+  const { text, stopReason } = await askClaude({ system, prompt, maxTokens: 1200 });
+  const r = extractJson(text, { stopReason });
+  const limpiar = (t) => String(t || '').trim().replace(/^["']|["']$/g, '').replace(/[.]$/, '');
+  const titulo = limpiar(r.titulo);
+
+  if (tipo === 'tres_momentos') {
+    const pasos = (Array.isArray(r.pasos) ? r.pasos : []).map(limpiar).filter(Boolean).slice(0, 3);
+    if (!titulo || pasos.length < 3) return null;
+    return { titulo, hipotetico: r.hipotetico !== false, pasos };
+  }
+  const izquierda = (Array.isArray(r.izquierda) ? r.izquierda : []).map(limpiar).filter(Boolean).slice(0, 3);
+  const derecha = (Array.isArray(r.derecha) ? r.derecha : []).map(limpiar).filter(Boolean).slice(0, 3);
+  if (!titulo || izquierda.length < 2 || derecha.length < 2) return null;
+  return { titulo, izquierda, derecha };
+}
+
 // Pantalla 3b — copy para mensajes directos de LinkedIn (1 a 1, prospección puntual) o
 // artículos/posts de LinkedIn, según "tema" (elegido de una lista) + "contexto" (texto
 // libre: quién es el prospecto, o de qué trata puntualmente el artículo). Distinto de
@@ -374,5 +456,6 @@ module.exports = {
   sugerirCopy,
   sugerirTitularYBajada,
   sugerirCarrusel,
+  sugerirGraficoLead,
   sugerirCopyLinkedin,
 };
