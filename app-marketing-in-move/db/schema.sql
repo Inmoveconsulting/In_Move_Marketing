@@ -194,6 +194,15 @@ ALTER TABLE contenido_linkedin ADD COLUMN IF NOT EXISTS feedback TEXT;
 ALTER TABLE contenido_linkedin ADD COLUMN IF NOT EXISTS programado_en TIMESTAMPTZ;
 ALTER TABLE contenido_linkedin ADD COLUMN IF NOT EXISTS metricool_post_id TEXT;
 
+-- Banco de fotos (campana de leads): fotos que se usan de fondo en las imagenes con foto.
+CREATE TABLE IF NOT EXISTS fotos_banco (
+  id SERIAL PRIMARY KEY,
+  producto_id INTEGER NOT NULL REFERENCES productos(id),
+  nombre TEXT DEFAULT '',
+  imagen TEXT NOT NULL,
+  creado_en TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 -- Productos iniciales (no pisa nada si ya existen).
 INSERT INTO productos (slug, nombre) VALUES ('talent', 'In Move Talent') ON CONFLICT (slug) DO NOTHING;
 INSERT INTO productos (slug, nombre) VALUES ('readiness', 'In Move Readiness') ON CONFLICT (slug) DO NOTHING;

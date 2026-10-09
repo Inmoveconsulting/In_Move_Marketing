@@ -619,6 +619,253 @@ async function crearGraficoLead({ tipo, datos, logoDataUri, autorFotoDataUri, au
   return `data:image/png;base64,${resultado.toString('base64')}`;
 }
 
+// ---------------------------------------------------------------------------------------
+// Imágenes con FOTO (campaña de leads) — dos estilos que se alternan al azar, inspirados en
+// avisos de redes de empresas del rubro (no se copian: solo el lenguaje visual, con la
+// paleta, el logo y la firma de In Move):
+//   - "degradado": foto a pantalla completa, degradé azul marino desde abajo, una etiqueta
+//     (píldora blanca), el titular grande y una caja translúcida con una frase de apoyo.
+//   - "panel": fondo azul con degradé, foto de la persona a la derecha que se funde con el
+//     fondo, titular a la izquierda y un panel con tres puntos tildados.
+// Las fotos salen del banco de fotos del producto (routes/fotos.js), no de una IA de
+// imagen. El texto lo arma Claude (lib/sugerenciasIA.js sugerirTextoConFoto) y se dibuja
+// acá con código — mismo criterio que el resto: el texto de un modelo de imagen sale mal.
+// ---------------------------------------------------------------------------------------
+
+const ESTILOS_FOTO = ['degradado', 'panel'];
+const AZUL_MARINO = '#0B2F52';
+
+function estiloFotoAleatorio() {
+  return ESTILOS_FOTO[Math.floor(Math.random() * ESTILOS_FOTO.length)];
+}
+
+function construirFotoDegradadoSvg({ datos, ancho, alto, conLogo, conAutor, autorNombre, autorCargo }) {
+  const w = ancho;
+  const h = alto;
+  const colores = { fondo: AZUL_MARINO, texto: '#FFFFFF', textoSecundario: '#C9D9E8' };
+  const g = geometriaGrafico(w, h);
+  const k = esVertical(w, h) ? 1.2 : 1;
+  const anchoUtil = w - g.paddingX * 2;
+
+  const vertical = esVertical(w, h);
+  const tamTitulo = Math.round(w * (vertical ? 0.066 : 0.056) * k);
+  const interTitulo = Math.round(tamTitulo * 1.15);
+  const lineasTitulo = envolverTexto(datos.titulo, Math.floor(anchoUtil / (tamTitulo * 0.56)), 3);
+  const altoTitulo = lineasTitulo.length * interTitulo;
+
+  const tamKicker = Math.round(w * 0.03 * k);
+  const kickerH = datos.kicker ? Math.round(tamKicker * 2.1) : 0;
+  const kickerW = datos.kicker
+    ? Math.min(anchoUtil, Math.round(datos.kicker.length * tamKicker * 0.62 + tamKicker * 2))
+    : 0;
+
+  const tamApoyo = Math.round(w * (vertical ? 0.03 : 0.027) * k);
+  const interApoyo = Math.round(tamApoyo * 1.3);
+  const padCaja = Math.round(w * (vertical ? 0.03 : 0.024) * k);
+  const lineasApoyo = datos.apoyo
+    ? envolverTexto(datos.apoyo, Math.floor((anchoUtil - padCaja * 2) / (tamApoyo * 0.54)), vertical ? 3 : 2)
+    : [];
+  const cajaH = lineasApoyo.length ? lineasApoyo.length * interApoyo + padCaja * 2 : 0;
+
+  const gap = Math.round(w * 0.03 * k);
+  const partes = [kickerH, altoTitulo, cajaH].filter((x) => x > 0);
+  const bloqueAlto = partes.reduce((s, x) => s + x, 0) + gap * (partes.length - 1);
+  const yBase = g.firmaY - Math.round(w * 0.04);
+  const yTop = yBase - bloqueAlto;
+  const yDegrade = Math.max(0, yTop - Math.round(h * 0.2));
+
+  let y = yTop;
+  const kicker = kickerH
+    ? `<rect x="${g.paddingX}" y="${y}" width="${kickerW}" height="${kickerH}" rx="${kickerH / 2}" fill="#ffffff" />
+  <text x="${g.paddingX + kickerW / 2}" y="${y + kickerH / 2 + Math.round(tamKicker * 0.35)}" text-anchor="middle" font-family="Inter" font-size="${tamKicker}" font-weight="700" fill="${AZUL_MARINO}">${escaparXml(datos.kicker)}</text>`
+    : '';
+  if (kickerH) y += kickerH + gap;
+  const titulo = bloqueTexto({ x: g.paddingX, y, lineas: lineasTitulo, tam: tamTitulo, interlinea: interTitulo, peso: 700, fill: '#ffffff' });
+  y += altoTitulo + gap;
+  const caja = cajaH
+    ? `<rect x="${g.paddingX}" y="${y}" width="${anchoUtil}" height="${cajaH}" rx="28" fill="#ffffff" fill-opacity="0.14" stroke="#ffffff" stroke-opacity="0.4" stroke-width="2" />
+  ${bloqueTexto({ x: g.paddingX + padCaja, y: y + padCaja, lineas: lineasApoyo, tam: tamApoyo, interlinea: interApoyo, peso: 500, fill: '#ffffff' })}`
+    : '';
+
+  return `
+<svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="deg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="${AZUL_MARINO}" stop-opacity="0" />
+      <stop offset="0.45" stop-color="${AZUL_MARINO}" stop-opacity="0.78" />
+      <stop offset="1" stop-color="${AZUL_MARINO}" stop-opacity="0.96" />
+    </linearGradient>
+  </defs>
+  <rect x="0" y="${yDegrade}" width="${w}" height="${h - yDegrade}" fill="url(#deg)" />
+  ${cajaLogoSvg({ g, colores, conLogo })}
+  ${kicker}
+  ${titulo}
+  ${caja}
+  ${conAutor ? firmaGraficoSvg({ g, w, colores, autorNombre, autorCargo }) : ''}
+</svg>`.trim();
+}
+
+// Zona donde va la foto en el estilo "panel", y cuánto se funde con el fondo.
+function geometriaFotoPanel(w, h) {
+  if (esVertical(w, h)) {
+    const y = Math.round(h * 0.36);
+    return { x: 0, y, ancho: w, alto: h - y, fadeIzq: 0, fadeArriba: 0.35 };
+  }
+  const x = Math.round(w * 0.46);
+  const y = Math.round(h * 0.1);
+  return { x, y, ancho: w - x, alto: h - y, fadeIzq: 0.4, fadeArriba: 0.15 };
+}
+
+function construirFotoPanelSvg({ datos, ancho, alto, conLogo, conAutor, autorNombre, autorCargo }) {
+  const w = ancho;
+  const h = alto;
+  const vertical = esVertical(w, h);
+  const colores = { fondo: '#1F6FA8', texto: '#FFFFFF', textoSecundario: '#D6EAF5' };
+  const g = geometriaGrafico(w, h);
+  const k = vertical ? 1.2 : 1;
+  const anchoUtil = w - g.paddingX * 2;
+
+  const colTexto = vertical ? anchoUtil : Math.round(w * 0.58) - g.paddingX;
+  const tamTitulo = Math.round(w * 0.062 * k);
+  const interTitulo = Math.round(tamTitulo * 1.15);
+  const lineasTitulo = envolverTexto(datos.titulo, Math.floor(colTexto / (tamTitulo * 0.56)), 3);
+  const yTitulo = g.logoY + g.logoH + Math.round(h * 0.035);
+  const finTitulo = yTitulo + lineasTitulo.length * interTitulo;
+
+  const panelW = vertical ? anchoUtil : Math.round(w * 0.64);
+  const padPanel = Math.round(w * 0.03);
+  const r = Math.round(w * 0.024 * k);
+  const gapCirc = Math.round(w * 0.025);
+  const tamPunto = Math.round(w * 0.03 * k);
+  const interPunto = Math.round(tamPunto * 1.25);
+  const maxChars = Math.max(10, Math.floor((panelW - padPanel * 2 - r * 2 - gapCirc) / (tamPunto * 0.54)));
+  const puntos = datos.puntos.slice(0, 3).map((p) => envolverTexto(p, maxChars, 2));
+  const altoFila = (l) => Math.max(r * 2, l.length * interPunto);
+  const gapFila = Math.round(w * 0.025 * k);
+  const panelH = padPanel * 2 + puntos.reduce((s, l) => s + altoFila(l), 0) + gapFila * (puntos.length - 1);
+  const panelY = Math.max(finTitulo + 24, g.firmaY - Math.round(w * 0.04) - panelH);
+
+  let yFila = panelY + padPanel;
+  const filas = puntos
+    .map((lineas) => {
+      const alto = altoFila(lineas);
+      const cx = g.paddingX + padPanel + r;
+      const cy = yFila + alto / 2;
+      const fila = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="#ffffff" />
+  <polyline points="${cx - r * 0.45},${cy} ${cx - r * 0.1},${cy + r * 0.38} ${cx + r * 0.5},${cy - r * 0.36}" fill="none" stroke="#1F6FA8" stroke-width="${Math.max(3, Math.round(r * 0.22))}" stroke-linecap="round" stroke-linejoin="round" />
+  ${bloqueTexto({ x: cx + r + gapCirc, y: yFila + (alto - lineas.length * interPunto) / 2, lineas, tam: tamPunto, interlinea: interPunto, peso: 500, fill: '#ffffff' })}`;
+      yFila += alto + gapFila;
+      return fila;
+    })
+    .join('\n  ');
+
+  const yPie = g.firmaY - Math.round(h * 0.08);
+  return `
+<svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="pie" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="${AZUL_MARINO}" stop-opacity="0" />
+      <stop offset="1" stop-color="${AZUL_MARINO}" stop-opacity="0.85" />
+    </linearGradient>
+  </defs>
+  <rect x="0" y="${yPie}" width="${w}" height="${h - yPie}" fill="url(#pie)" />
+  ${cajaLogoSvg({ g, colores, conLogo })}
+  ${bloqueTexto({ x: g.paddingX, y: yTitulo, lineas: lineasTitulo, tam: tamTitulo, interlinea: interTitulo, peso: 700, fill: '#ffffff' })}
+  <rect x="${g.paddingX}" y="${panelY}" width="${panelW}" height="${panelH}" rx="30" fill="${AZUL_MARINO}" fill-opacity="0.62" stroke="#ffffff" stroke-opacity="0.25" stroke-width="2" />
+  ${filas}
+  ${conAutor ? firmaGraficoSvg({ g, w, colores, autorNombre, autorCargo }) : ''}
+</svg>`.trim();
+}
+
+function fondoPanelSvg(w, h) {
+  return `<svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">
+  <defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#4A97CB" /><stop offset="1" stop-color="#1B5F94" />
+  </linearGradient></defs>
+  <rect width="${w}" height="${h}" fill="url(#bg)" />
+</svg>`;
+}
+
+// Máscara de transparencia para fundir la foto con el fondo: alfa 0 en el borde izquierdo
+// (o superior) que sube a 1 a lo largo de "fraccion" del ancho (o alto).
+function mascaraDegrade(ancho, alto, fraccion, direccion) {
+  const [x2, y2] = direccion === 'h' ? [1, 0] : [0, 1];
+  return Buffer.from(`<svg width="${ancho}" height="${alto}" xmlns="http://www.w3.org/2000/svg">
+  <defs><linearGradient id="m" x1="0" y1="0" x2="${x2}" y2="${y2}">
+    <stop offset="0" stop-color="#fff" stop-opacity="0" />
+    <stop offset="${fraccion}" stop-color="#fff" stop-opacity="1" />
+    <stop offset="1" stop-color="#fff" stop-opacity="1" />
+  </linearGradient></defs>
+  <rect width="${ancho}" height="${alto}" fill="url(#m)" />
+</svg>`);
+}
+
+async function logoYFirmaComposicion({ g, logoDataUri, autorFotoDataUri, conAutor }) {
+  const capas = [];
+  if (logoDataUri) {
+    const padding = Math.round(g.logoH * 0.18);
+    const logoBuffer = Buffer.from(logoDataUri.split(',')[1], 'base64');
+    const logo = await sharp(logoBuffer)
+      .resize({ width: g.logoW - padding * 2, height: g.logoH - padding * 2, fit: 'inside' })
+      .png()
+      .toBuffer();
+    const meta = await sharp(logo).metadata();
+    capas.push({
+      input: logo,
+      top: g.logoY + Math.round((g.logoH - (meta.height || 0)) / 2),
+      left: g.logoX + Math.round((g.logoW - (meta.width || 0)) / 2),
+    });
+  }
+  if (conAutor) {
+    const mascara = Buffer.from(
+      `<svg width="${g.fotoDiam}" height="${g.fotoDiam}"><circle cx="${g.fotoDiam / 2}" cy="${g.fotoDiam / 2}" r="${g.fotoDiam / 2}" fill="#fff"/></svg>`
+    );
+    const redonda = await sharp(Buffer.from(autorFotoDataUri.split(',')[1], 'base64'))
+      .resize({ width: g.fotoDiam, height: g.fotoDiam, fit: 'cover' })
+      .composite([{ input: mascara, blend: 'dest-in' }])
+      .png()
+      .toBuffer();
+    capas.push({ input: redonda, top: g.firmaY, left: g.paddingX });
+  }
+  return capas;
+}
+
+// estilo: 'degradado' | 'panel'. datos: ver sugerirTextoConFoto. fotoDataUri: una foto del
+// banco. Devuelve un data URI PNG, igual que crearTarjetaPersonal.
+async function crearImagenConFoto({ estilo, datos, fotoDataUri, logoDataUri, autorFotoDataUri, autorNombre, autorCargo, ancho, alto }) {
+  const w = ancho || LADO;
+  const h = alto || LADO;
+  const conAutor = !!(autorFotoDataUri && autorNombre);
+  const g = geometriaGrafico(w, h);
+  const fotoBuffer = Buffer.from(fotoDataUri.split(',')[1], 'base64');
+  // Arriba: en fotos de personas la cabeza queda en el tercio superior, no se recorta.
+  const opcionesCover = { fit: 'cover', position: 'north' };
+  const params = { datos, ancho: w, alto: h, conLogo: !!logoDataUri, conAutor, autorNombre, autorCargo };
+  const capasFinales = await logoYFirmaComposicion({ g, logoDataUri, autorFotoDataUri, conAutor });
+
+  let base;
+  const composicion = [];
+
+  if (estilo === 'panel') {
+    const f = geometriaFotoPanel(w, h);
+    const recorte = await sharp(fotoBuffer).rotate().resize(f.ancho, f.alto, opcionesCover).png().toBuffer();
+    const mascaras = [];
+    if (f.fadeIzq > 0) mascaras.push({ input: mascaraDegrade(f.ancho, f.alto, f.fadeIzq, 'h'), blend: 'dest-in' });
+    if (f.fadeArriba > 0) mascaras.push({ input: mascaraDegrade(f.ancho, f.alto, f.fadeArriba, 'v'), blend: 'dest-in' });
+    const foto = mascaras.length ? await sharp(recorte).composite(mascaras).png().toBuffer() : recorte;
+    base = sharp(await sharp(Buffer.from(fondoPanelSvg(w, h))).png().toBuffer());
+    composicion.push({ input: foto, left: f.x, top: f.y });
+    composicion.push({ input: overlayAPng(construirFotoPanelSvg(params), w), left: 0, top: 0 });
+  } else {
+    const fotoCompleta = await sharp(fotoBuffer).rotate().resize(w, h, opcionesCover).png().toBuffer();
+    base = sharp(fotoCompleta);
+    composicion.push({ input: overlayAPng(construirFotoDegradadoSvg(params), w), left: 0, top: 0 });
+  }
+
+  const resultado = await base.composite([...composicion, ...capasFinales]).png().toBuffer();
+  return `data:image/png;base64,${resultado.toString('base64')}`;
+}
+
 // construirDosPartesSvg / construirTresMomentosSvg / PALETA_TARJETA se exportan solo para
 // poder previsualizar los diseños fuera de la app (renderizando el SVG en un navegador).
 module.exports = {
@@ -626,6 +873,12 @@ module.exports = {
   crearTarjetaPersonal,
   crearCarrusel,
   crearGraficoLead,
+  crearImagenConFoto,
+  estiloFotoAleatorio,
+  ESTILOS_FOTO,
+  construirFotoDegradadoSvg,
+  construirFotoPanelSvg,
+  geometriaFotoPanel,
   construirDosPartesSvg,
   construirTresMomentosSvg,
   PALETA_TARJETA,

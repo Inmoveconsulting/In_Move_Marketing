@@ -102,6 +102,10 @@
                       </div>
                     </form>
 
+                    <form method="POST" action="/productos/<%= producto.slug %>/contenido/pieza/<%= p.id %>/foto">
+                      <div class="form-actions"><button type="submit"><%= p.imagen_ref ? 'Regenerar con foto' : 'Imagen con foto' %> (estilo al azar)</button></div>
+                    </form>
+
                     <p class="muted small" style="margin-top:10px">Gráficos para leads (sin costo de IA de imágenes):</p>
                     <form method="POST" action="/productos/<%= producto.slug %>/contenido/pieza/<%= p.id %>/grafico">
                       <input type="hidden" name="tipo" value="dos_partes">

@@ -14,6 +14,7 @@ const contenidoLinkedinRouter = require('./routes/contenidoLinkedin');
 const aprobacionRouter = require('./routes/aprobacion');
 const publicacionRouter = require('./routes/publicacion');
 const resultadosRouter = require('./routes/resultados');
+const fotosRouter = require('./routes/fotos');
 
 const app = express();
 
@@ -37,6 +38,7 @@ app.use('/', productosRouter);
 app.use('/productos/:slug/perfil', perfilesRouter);
 app.use('/productos/:slug/plan', planesRouter);
 app.use('/productos/:slug/identidad-visual', identidadVisualRouter);
+app.use('/productos/:slug/fotos', fotosRouter);
 app.use('/productos/:slug/contenido', contenidoRouter);
 app.use('/productos/:slug/linkedin', contenidoLinkedinRouter);
 app.use('/productos/:slug/aprobacion', aprobacionRouter);

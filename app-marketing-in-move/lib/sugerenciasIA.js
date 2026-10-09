@@ -381,6 +381,66 @@ Respondé con este JSON exacto:
   return { titulo, izquierda, derecha };
 }
 
+// Texto para las imágenes con FOTO (lib/imagenPieza.js crearImagenConFoto), dos estilos:
+//   - "degradado": etiqueta corta + titular + frase de apoyo.
+//   - "panel": titular + tres puntos tildados.
+// Mismas reglas duras que sugerirGraficoLead: nada de cifras, clientes ni resultados
+// inventados — solo lo que figure en los ejemplos de referencia del perfil.
+async function sugerirTextoConFoto({ perfil, pilar, copy, estilo }) {
+  const system =
+    'Sos un copywriter B2B que escribe textos muy breves para imágenes de redes. Escribís en español rioplatense neutro. Respondés ÚNICAMENTE con JSON válido, sin texto extra antes o después, sin bloques de código.';
+
+  const contexto = `
+TONO DE VOZ DE LA MARCA:
+${perfil.tono_voz}
+
+EJEMPLOS DE REFERENCIA (única fuente permitida de datos y casos reales):
+${perfil.ejemplos_referencia}
+
+PILAR DE CONTENIDO: ${pilar.pilar}
+${pilar.descripcion}
+
+COPY DE ESTA PIEZA (la imagen acompaña la misma idea, no la repite literal):
+${copy}
+
+REGLAS DURAS:
+- No inventes cifras, porcentajes, nombres de clientes ni resultados.
+- Poco texto, que se entienda de un vistazo. Hablale a quien contrata, desde su situación.
+- Sin punto final en titulares ni etiquetas. Evidencia sobre promesa, sin exageraciones.`.trim();
+
+  const prompt =
+    estilo === 'panel'
+      ? `${contexto}
+
+Tarea: texto para una imagen con un titular y tres puntos tildados.
+- "titulo": máximo 9 palabras.
+- "puntos": exactamente 3 frases de máximo 6 palabras cada una, sobre qué se obtiene o qué se
+  mira en la evaluación (sin prometer resultados).
+
+Respondé con este JSON exacto:
+{"titulo": "<máx 9 palabras>", "puntos": ["<punto 1>", "<punto 2>", "<punto 3>"]}`
+      : `${contexto}
+
+Tarea: texto para una imagen con etiqueta, titular y una frase de apoyo.
+- "kicker": etiqueta de máximo 3 palabras (el tema o el público, ej. "Gerentes de RR.HH.").
+- "titulo": el titular, máximo 10 palabras.
+- "apoyo": una frase que lo sostiene, máximo 16 palabras.
+
+Respondé con este JSON exacto:
+{"kicker": "<máx 3 palabras>", "titulo": "<máx 10 palabras>", "apoyo": "<máx 16 palabras>"}`;
+
+  const { text, stopReason } = await askClaude({ system, prompt: prompt.trim(), maxTokens: 1000 });
+  const r = extractJson(text, { stopReason });
+  const limpiar = (t) => String(t || '').trim().replace(/^["']|["']$/g, '').replace(/[.]$/, '');
+  const titulo = limpiar(r.titulo);
+  if (!titulo) return null;
+  if (estilo === 'panel') {
+    const puntos = (Array.isArray(r.puntos) ? r.puntos : []).map(limpiar).filter(Boolean).slice(0, 3);
+    return puntos.length >= 2 ? { titulo, puntos } : null;
+  }
+  return { kicker: limpiar(r.kicker), titulo, apoyo: limpiar(r.apoyo) };
+}
+
 // Pantalla 3b — copy para mensajes directos de LinkedIn (1 a 1, prospección puntual) o
 // artículos/posts de LinkedIn, según "tema" (elegido de una lista) + "contexto" (texto
 // libre: quién es el prospecto, o de qué trata puntualmente el artículo). Distinto de
@@ -457,5 +517,6 @@ module.exports = {
   sugerirTitularYBajada,
   sugerirCarrusel,
   sugerirGraficoLead,
+  sugerirTextoConFoto,
   sugerirCopyLinkedin,
 };

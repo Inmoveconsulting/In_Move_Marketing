@@ -1,0 +1,44 @@
+<%- include('../partials/header') %>
+
+<div class="perfil-header">
+  <div>
+    <h1>Banco de fotos</h1>
+    <span class="muted small"><%= fotos.length %> foto(s)</span>
+  </div>
+</div>
+
+<% if (error) { %>
+  <p class="callout callout-error"><%= error %></p>
+<% } %>
+
+<p class="field-help">
+  Estas fotos se usan de fondo en las imágenes con foto de Contenido (los dos estilos —
+  foto a pantalla completa con degradé, y foto a un costado con panel— se alternan al
+  azar, y cada imagen elige una foto al azar). Conviene tener al menos 8 a 10 para que no
+  se repitan. Mejor: personas en contexto de trabajo real (no poses de stock), con el
+  rostro a la vista y espacio libre abajo o a un costado. Usá fotos propias o de bancos
+  gratuitos con licencia comercial (por ejemplo Unsplash o Pexels). No subas fotos de
+  candidatos reales ni de clientes sin autorización.
+</p>
+
+<form method="POST" action="/productos/<%= producto.slug %>/fotos/subir" enctype="multipart/form-data">
+  <input type="file" name="fotos" accept="image/*" multiple>
+  <div class="form-actions"><button type="submit">Subir fotos (hasta 12 por vez)</button></div>
+</form>
+
+<% if (fotos.length === 0) { %>
+  <p class="callout">Todavía no hay fotos cargadas.</p>
+<% } else { %>
+  <div style="display:flex; flex-wrap:wrap; gap:14px; margin-top:18px;">
+    <% fotos.forEach(function (f) { %>
+      <div style="width:150px;">
+        <img src="<%= f.imagen %>" alt="<%= f.nombre %>" style="width:150px; height:150px; object-fit:cover; border-radius:10px; display:block;">
+        <form method="POST" action="/productos/<%= producto.slug %>/fotos/<%= f.id %>/eliminar" style="margin-top:6px;">
+          <button type="submit">Quitar</button>
+        </form>
+      </div>
+    <% }); %>
+  </div>
+<% } %>
+
+<%- include('../partials/footer') %>

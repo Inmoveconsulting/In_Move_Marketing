@@ -9,9 +9,9 @@ const {
   getPerfilPorId,
   getIdentidadVisualAprobadaActual,
 } = require('../lib/queries');
-const { sugerirCopy, sugerirTitularYBajada, sugerirCarrusel, sugerirGraficoLead } = require('../lib/sugerenciasIA');
+const { sugerirCopy, sugerirTitularYBajada, sugerirCarrusel, sugerirGraficoLead, sugerirTextoConFoto } = require('../lib/sugerenciasIA');
 const { generarFondoImagen } = require('../lib/openaiImagenes');
-const { crearImagenPieza, crearTarjetaPersonal, crearCarrusel, crearGraficoLead } = require('../lib/imagenPieza');
+const { crearImagenPieza, crearTarjetaPersonal, crearCarrusel, crearGraficoLead, crearImagenConFoto, estiloFotoAleatorio } = require('../lib/imagenPieza');
 
 // Pantalla 3 — Generación de contenido. Se genera por tramo (semana), no el plan completo
 // de una (regla de la spec). El pilar de cada semana rota sobre el calendario del plan.
@@ -101,6 +101,38 @@ function tomaAleatoria() {
   return TOMAS[Math.floor(Math.random() * TOMAS.length)];
 }
 
+// Imagen con foto del banco (estilos "degradado" / "panel", al azar). Devuelve null si el
+// banco de fotos está vacío, para que quien llama caiga en la tarjeta personal.
+async function generarImagenConFotoParaPieza({ pieza, plan, perfil, identidad, estilo }) {
+  const { rows: fotos } = await pool.query(
+    'SELECT imagen FROM fotos_banco WHERE producto_id = $1 ORDER BY random() LIMIT 1',
+    [plan.producto_id]
+  );
+  if (fotos.length === 0) return null;
+
+  const estiloFinal = estilo || estiloFotoAleatorio();
+  const pilarObj = (plan.calendario || []).find((p) => p.pilar === pieza.pilar) || {
+    pilar: pieza.pilar,
+    descripcion: '',
+  };
+  const datos = await sugerirTextoConFoto({ perfil, pilar: pilarObj, copy: pieza.copy, estilo: estiloFinal });
+  if (!datos) throw new Error('La IA no devolvió un texto utilizable para la imagen.');
+
+  const { ancho, alto } = dimensionesDe(pieza.canal, pieza.formato);
+  const imagen = await crearImagenConFoto({
+    estilo: estiloFinal,
+    datos,
+    fotoDataUri: fotos[0].imagen,
+    logoDataUri: identidad.logo,
+    autorFotoDataUri: identidad.autor_foto,
+    autorNombre: identidad.autor_nombre,
+    autorCargo: identidad.autor_cargo,
+    ancho,
+    alto,
+  });
+  return { imagen, titular: datos.titulo, bajada: datos.apoyo || '' };
+}
+
 // Arma el titular+bajada (vía IA) y compone la imagen final con el formato "tarjeta
 // personal" (fondo de color de marca + logo + titular/bajada + firma) — reemplazó al
 // formato de foto generada por IA a partir del 25-ago-2026, por pedido de la usuaria: más
@@ -109,6 +141,13 @@ function tomaAleatoria() {
 // generarImagenIAConOpenAI más abajo, sin usar — no se borró por si se quiere revivir o
 // alternar entre los dos formatos más adelante.
 async function generarImagenParaPieza({ pieza, plan, perfil, identidad, titularOverride, bajadaOverride }) {
+  // Campaña de leads: si hay fotos cargadas en el banco y la usuaria no escribió un titular
+  // a mano, la imagen sale con foto (estilo al azar). Sin fotos, sigue la tarjeta personal.
+  if (!titularOverride && !bajadaOverride) {
+    const conFoto = await generarImagenConFotoParaPieza({ pieza, plan, perfil, identidad });
+    if (conFoto) return conFoto;
+  }
+
   const pilarObj = (plan.calendario || []).find((p) => p.pilar === pieza.pilar) || {
     pilar: pieza.pilar,
     descripcion: '',
@@ -549,6 +588,49 @@ router.post('/pieza/:id/carrusel', async (req, res, next) => {
   } catch (err) {
     res.redirect(
       `/productos/${req.producto.slug}/contenido?error=${encodeURIComponent('No se pudo crear el carrusel: ' + err.message)}`
+    );
+  }
+});
+
+// Imagen con foto del banco, a pedido de una pieza puntual (estilo al azar, o el que se
+// indique en el campo "estilo").
+router.post('/pieza/:id/foto', async (req, res, next) => {
+  try {
+    const { rows } = await pool.query('SELECT * FROM contenido_generado WHERE id = $1', [req.params.id]);
+    const pieza = rows[0];
+    if (!pieza || CANALES_SIN_IMAGEN.includes(pieza.canal)) {
+      return res.redirect(`/productos/${req.producto.slug}/contenido`);
+    }
+    const identidad = await getIdentidadVisualAprobadaActual(req.producto.id);
+    if (!identidad) {
+      return res.redirect(
+        `/productos/${req.producto.slug}/contenido?error=${encodeURIComponent('Necesitás aprobar Identidad visual antes de crear una imagen.')}`
+      );
+    }
+    const { rows: planRows } = await pool.query('SELECT * FROM planes_marketing WHERE id = $1', [
+      pieza.plan_marketing_id,
+    ]);
+    const plan = planRows[0];
+    const perfil = await getPerfilPorId(pieza.perfil_producto_id);
+    const estilo = ['degradado', 'panel'].includes(req.body.estilo) ? req.body.estilo : undefined;
+
+    const r = await generarImagenConFotoParaPieza({ pieza, plan, perfil, identidad, estilo });
+    if (!r) {
+      return res.redirect(
+        `/productos/${req.producto.slug}/contenido?error=${encodeURIComponent('El banco de fotos está vacío — subí fotos en la sección "Fotos".')}`
+      );
+    }
+    await pool.query(
+      `UPDATE contenido_generado SET
+         imagen_ref = $1, imagenes_carrusel = '[]', texto_imagen = $2, bajada_imagen = $3,
+         actualizado_en = now()
+       WHERE id = $4`,
+      [r.imagen, r.titular, r.bajada, pieza.id]
+    );
+    res.redirect(`/productos/${req.producto.slug}/contenido#pieza-${pieza.id}`);
+  } catch (err) {
+    res.redirect(
+      `/productos/${req.producto.slug}/contenido?error=${encodeURIComponent('No se pudo crear la imagen con foto: ' + err.message)}`
     );
   }
 });
