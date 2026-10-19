@@ -496,3 +496,11 @@ button.btn-primary {
     grid-template-columns: 1fr;
   }
 }
+
+/* Pantalla 5 — configuración de inicio y horario por semana. */
+.semanas-config { margin: 16px 0 24px; }
+.semanas-config h2 { font-size: 1.05rem; margin-bottom: 4px; }
+.semana-fila { grid-template-columns: 1.4fr 1fr 1fr auto; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--card-bg); }
+.semana-fila label { display: flex; flex-direction: column; gap: 2px; }
+.semana-fila input { padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; font: inherit; background: var(--card-bg); color: var(--text); }
+@media (max-width: 700px) { .semana-fila { grid-template-columns: 1fr; } }

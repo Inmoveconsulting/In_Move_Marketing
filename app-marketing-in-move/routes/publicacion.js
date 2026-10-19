@@ -38,11 +38,25 @@ function lunesDeEstaSemana() {
 // 09:00), lo empuja a la semana siguiente — Metricool rechaza con error 400 cualquier
 // fecha/hora en el pasado, así que sugerir un día ya pasado rompe el flujo en vez de
 // ayudar.
-function sugerirFecha(semana, diasTexto, lunesBase) {
+function sugerirFecha(semana, diasTexto, lunesBase, config) {
   if (!semana || !diasTexto) return '';
   const primerDia = String(diasTexto).split(',')[0].trim().toLowerCase();
   const indiceLunes1 = DIAS_SEMANA[primerDia];
   if (indiceLunes1 === undefined) return '';
+
+  // Si se eligió con qué fecha arranca ESTA semana, el día de la pieza es el primero que
+  // cae a partir de esa fecha (dentro de los 7 días que arrancan ahí, cada día de la
+  // semana aparece una sola vez). No se empuja a la semana siguiente: la fecha la eligió
+  // quien programa, y si quedó en el pasado Metricool lo avisa con un error claro.
+  if (config && config.fecha_inicio) {
+    const [y, m, d] = config.fecha_inicio.split('-').map(Number);
+    const inicio = new Date(y, m - 1, d);
+    const delta = (indiceLunes1 - inicio.getDay() + 7) % 7;
+    const fecha = new Date(y, m - 1, d + delta);
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${fecha.getFullYear()}-${pad(fecha.getMonth() + 1)}-${pad(fecha.getDate())}`;
+  }
+
   const offsetDesdeLunes = indiceLunes1 === 0 ? 6 : indiceLunes1 - 1; // lunes=0, domingo=6
   const fecha = new Date(lunesBase);
   fecha.setDate(fecha.getDate() + (semana - 1) * 7 + offsetDesdeLunes);
@@ -137,7 +151,7 @@ function construirProvider(canal, formato) {
 router.get('/', async (req, res, next) => {
   try {
     const { rows: piezasContenido } = await pool.query(
-      `SELECT cg.*, pm.canales AS plan_canales, 'contenido' AS origen
+      `SELECT cg.*, pm.canales AS plan_canales, pm.version AS plan_version, 'contenido' AS origen
        FROM contenido_generado cg
        JOIN planes_marketing pm ON pm.id = cg.plan_marketing_id
        WHERE pm.producto_id = $1 AND cg.estado = 'aprobado'
@@ -151,6 +165,21 @@ router.get('/', async (req, res, next) => {
       [req.producto.id]
     );
     const lunesBase = lunesDeEstaSemana();
+
+    // Configuración por semana (con qué fecha arranca y horario por defecto), una fila por
+    // plan+semana. Sin fila se usa lunes de esta semana + 09:00, como antes.
+    const planIds = [...new Set(piezasContenido.map((p) => p.plan_marketing_id))];
+    const configPorSemana = {};
+    if (planIds.length > 0) {
+      const { rows: configs } = await pool.query(
+        `SELECT plan_marketing_id, semana, fecha_inicio::text AS fecha_inicio, hora_defecto
+         FROM publicacion_semana WHERE plan_marketing_id = ANY($1)`,
+        [planIds]
+      );
+      configs.forEach((c) => {
+        configPorSemana[`${c.plan_marketing_id}|${c.semana}`] = c;
+      });
+    }
 
     // Agrupa las piezas de contenido por semana+canal para poder repartir los días
     // configurados entre ellas (ej: 4 piezas de LinkedIn en la semana 1 -> lunes, martes,
@@ -167,6 +196,7 @@ router.get('/', async (req, res, next) => {
     for (const p of [...piezasContenido, ...piezasLinkedin]) {
       const canalReal = p.origen === 'linkedin' ? 'LinkedIn' : p.canal;
       let fechaSugerida = '';
+      let horaSugerida = '09:00';
       let linkCta = null;
       if (p.origen === 'contenido') {
         const canalPlan = (p.plan_canales || []).find((c) => c.canal === canalReal);
@@ -178,11 +208,35 @@ router.get('/', async (req, res, next) => {
         // si hay más piezas que días configurados, rota (ej: 5 piezas, 4 días -> la 5ta
         // vuelve a caer en el 1er día) en vez de dejar la sugerencia vacía.
         const diaElegido = dias.length > 0 ? dias[posicion % dias.length] : '';
-        fechaSugerida = sugerirFecha(p.semana, diaElegido, lunesBase);
+        const cfg = configPorSemana[`${p.plan_marketing_id}|${p.semana}`];
+        fechaSugerida = sugerirFecha(p.semana, diaElegido, lunesBase, cfg);
+        if (cfg && cfg.hora_defecto) horaSugerida = cfg.hora_defecto;
         linkCta = await resolverLinkCta(p);
       }
-      piezas.push({ ...p, canalReal, fechaSugerida, linkCta });
+      piezas.push({ ...p, canalReal, fechaSugerida, horaSugerida, linkCta });
     }
+
+    // Una fila de configuración por cada plan+semana que todavía tiene piezas por programar.
+    const semanasPorProgramar = [];
+    const vistas = {};
+    piezas.forEach((p) => {
+      if (p.origen !== 'contenido') return;
+      const key = `${p.plan_marketing_id}|${p.semana}`;
+      if (!vistas[key]) {
+        const cfg = configPorSemana[key] || {};
+        vistas[key] = {
+          planId: p.plan_marketing_id,
+          planVersion: p.plan_version,
+          semana: p.semana,
+          cantidad: 0,
+          fechaInicio: cfg.fecha_inicio || '',
+          horaDefecto: cfg.hora_defecto || '09:00',
+        };
+        semanasPorProgramar.push(vistas[key]);
+      }
+      vistas[key].cantidad += 1;
+    });
+    semanasPorProgramar.sort((a, b) => a.planId - b.planId || a.semana - b.semana);
 
     const { rows: programadasContenido } = await pool.query(
       `SELECT cg.*, 'contenido' AS origen
@@ -203,10 +257,48 @@ router.get('/', async (req, res, next) => {
     res.render('publicacion/show', {
       producto: req.producto,
       piezas,
+      semanasPorProgramar,
       programadas,
       canalesNoMetricool: CANALES_NO_METRICOOL,
       error: req.query.error || null,
     });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Guarda con qué fecha arranca una semana del plan y el horario por defecto de sus piezas.
+// Es solo la sugerencia que precarga cada pieza — después se puede ajustar pieza por pieza.
+router.post('/semana/:planId/:semana', async (req, res, next) => {
+  const volver = `/productos/${req.producto.slug}/publicacion`;
+  try {
+    const planId = parseInt(req.params.planId, 10);
+    const semana = parseInt(req.params.semana, 10);
+    if (!Number.isInteger(planId) || !Number.isInteger(semana) || semana < 1) return res.redirect(volver);
+
+    const { rows } = await pool.query(
+      'SELECT id FROM planes_marketing WHERE id = $1 AND producto_id = $2',
+      [planId, req.producto.id]
+    );
+    if (rows.length === 0) return res.redirect(volver);
+
+    const fecha = (req.body.fecha_inicio || '').trim();
+    const hora = (req.body.hora_defecto || '').trim();
+    if (fecha && !/^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
+      return res.redirect(`${volver}?error=${encodeURIComponent('La fecha de inicio no es válida.')}`);
+    }
+    if (!/^\d{2}:\d{2}$/.test(hora)) {
+      return res.redirect(`${volver}?error=${encodeURIComponent('El horario por defecto no es válido.')}`);
+    }
+
+    await pool.query(
+      `INSERT INTO publicacion_semana (plan_marketing_id, semana, fecha_inicio, hora_defecto, actualizado_en)
+       VALUES ($1, $2, $3, $4, now())
+       ON CONFLICT (plan_marketing_id, semana)
+       DO UPDATE SET fecha_inicio = EXCLUDED.fecha_inicio, hora_defecto = EXCLUDED.hora_defecto, actualizado_en = now()`,
+      [planId, semana, fecha || null, hora]
+    );
+    res.redirect(`${volver}#semana-${planId}-${semana}`);
   } catch (err) {
     next(err);
   }

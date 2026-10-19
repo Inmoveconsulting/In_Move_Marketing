@@ -38,6 +38,30 @@
   </details>
 <% } %>
 
+<% if (semanasPorProgramar.length > 0) { %>
+  <div class="semanas-config">
+    <h2>Cuándo arranca cada semana</h2>
+    <p class="field-help">
+      Elegí con qué fecha empieza cada semana y el horario por defecto de sus piezas. Cada
+      pieza se sugiere en el primer día que le toca a partir de esa fecha (según los días de
+      su canal en el plan). Después podés ajustar fecha y hora pieza por pieza.
+      Si no elegís fecha, se usa el lunes de esta semana.
+    </p>
+    <% semanasPorProgramar.forEach(function (s) { %>
+      <form method="POST" action="/productos/<%= producto.slug %>/publicacion/semana/<%= s.planId %>/<%= s.semana %>" class="cta-fila semana-fila" id="semana-<%= s.planId %>-<%= s.semana %>">
+        <strong>Semana <%= s.semana %> <span class="muted small">· plan v<%= s.planVersion %> · <%= s.cantidad %> por programar</span></strong>
+        <label class="small muted">Empieza el
+          <input type="date" name="fecha_inicio" value="<%= s.fechaInicio %>">
+        </label>
+        <label class="small muted">Horario por defecto
+          <input type="time" name="hora_defecto" value="<%= s.horaDefecto %>" required>
+        </label>
+        <button type="submit">Aplicar a la semana</button>
+      </form>
+    <% }); %>
+  </div>
+<% } %>
+
 <% if (piezas.length === 0) { %>
   <p class="callout">No hay piezas aprobadas pendientes de programar ahora mismo.</p>
 <% } else { %>
@@ -81,7 +105,7 @@
         <% } else { %>
           <form method="POST" action="/productos/<%= producto.slug %>/publicacion/pieza/<%= p.origen %>/<%= p.id %>/programar" class="cta-fila" style="grid-template-columns:1fr 1fr auto;">
             <input type="date" name="fecha" value="<%= p.fechaSugerida || '' %>" required>
-            <input type="time" name="hora" value="09:00" required>
+            <input type="time" name="hora" value="<%= p.horaSugerida || '09:00' %>" required>
             <button type="submit" class="btn-primary">Programar</button>
           </form>
           <% if (p.fechaSugerida) { %>

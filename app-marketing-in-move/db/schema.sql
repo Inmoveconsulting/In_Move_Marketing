@@ -204,6 +204,18 @@ CREATE TABLE IF NOT EXISTS fotos_banco (
   creado_en TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- publicacion_semana: Pantalla 5. Por semana de un plan, que fecha arranca esa semana al
+-- programar y el horario por defecto de sus piezas. Sin fila (o fecha vacia) se usa el
+-- comportamiento de siempre: lunes de esta semana + 09:00.
+CREATE TABLE IF NOT EXISTS publicacion_semana (
+  plan_marketing_id INTEGER NOT NULL REFERENCES planes_marketing(id),
+  semana INTEGER NOT NULL,
+  fecha_inicio DATE,
+  hora_defecto TEXT NOT NULL DEFAULT '09:00',
+  actualizado_en TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (plan_marketing_id, semana)
+);
+
 -- Productos iniciales (no pisa nada si ya existen).
 INSERT INTO productos (slug, nombre) VALUES ('talent', 'In Move Talent') ON CONFLICT (slug) DO NOTHING;
 INSERT INTO productos (slug, nombre) VALUES ('readiness', 'In Move Readiness') ON CONFLICT (slug) DO NOTHING;
