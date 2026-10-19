@@ -7,7 +7,7 @@
 
 const DEFAULT_MODEL = 'claude-sonnet-5';
 
-async function askClaude({ system, prompt, maxTokens = 1200 }) {
+async function askClaude({ system, prompt, maxTokens = 1200, sinPensar = false }) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     const err = new Error(
@@ -29,6 +29,9 @@ async function askClaude({ system, prompt, maxTokens = 1200 }) {
     body: JSON.stringify({
       model,
       max_tokens: maxTokens,
+      // sinPensar: los tokens de razonamiento previo cuentan contra max_tokens, asi que en
+      // salidas JSON largas se pueden comer el presupuesto y cortar la respuesta a la mitad.
+      ...(sinPensar ? { thinking: { type: 'disabled' } } : {}),
       system,
       messages: [{ role: 'user', content: prompt }],
     }),

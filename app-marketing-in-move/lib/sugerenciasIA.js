@@ -187,7 +187,7 @@ Respondé con este JSON exacto, sin nada más alrededor y sin campos extra. Sé 
   // maxTokens generoso a propósito: con 1500 se cortó con respuesta vacía (stop_reason:
   // max_tokens) — repartir el pilar en varios ángulos distintos pide más razonamiento previo
   // que escribir un copy, aunque el JSON final sea corto.
-  const { text, stopReason } = await askClaude({ system: SYSTEM, prompt, maxTokens: 5000 });
+  const { text, stopReason } = await askClaude({ system: SYSTEM, prompt, maxTokens: 5000, sinPensar: true });
   const data = extractJson(text, { stopReason });
   const angulos = Array.isArray(data) ? data : data.angulos;
   if (!Array.isArray(angulos) || angulos.length < piezas.length) {
