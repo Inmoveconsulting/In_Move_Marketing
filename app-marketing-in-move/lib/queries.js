@@ -70,6 +70,28 @@ async function getIdentidadVisualAprobadaActual(productoId) {
   return rows[0];
 }
 
+// Copys ya escritos que una pieza nueva (o regenerada) NO tiene que repetir: las otras
+// piezas de la misma semana (cualquier canal) + las de semanas anteriores del mismo pilar
+// (el calendario rota, asi que un pilar vuelve cada pocas semanas). Se devuelven recortados
+// — alcanza con ver como abrieron y que dijeron, no hace falta el texto entero.
+async function getCopysAEvitar({ planId, semana, pilar, excluirId = null }) {
+  const { rows } = await pool.query(
+    `SELECT id, semana, canal, formato, angulo, copy FROM contenido_generado
+     WHERE plan_marketing_id = $1
+       AND ($2::int IS NULL OR id <> $2)
+       AND (semana = $3 OR (pilar = $4 AND semana < $3))
+     ORDER BY semana DESC, id DESC
+     LIMIT 24`,
+    [planId, excluirId, semana, pilar]
+  );
+  return rows.map((r) => ({
+    semana: r.semana,
+    canal: r.canal,
+    angulo: r.angulo || '',
+    copy: (r.copy || '').replace(/\s+/g, ' ').trim().slice(0, 280),
+  }));
+}
+
 module.exports = {
   getProducto,
   getPerfilVersiones,
@@ -79,4 +101,5 @@ module.exports = {
   getIdentidadVisualVersiones,
   getPlanAprobadoActual,
   getIdentidadVisualAprobadaActual,
+  getCopysAEvitar,
 };

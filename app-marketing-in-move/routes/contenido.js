@@ -8,8 +8,9 @@ const {
   getPlanAprobadoActual,
   getPerfilPorId,
   getIdentidadVisualAprobadaActual,
+  getCopysAEvitar,
 } = require('../lib/queries');
-const { sugerirCopy, sugerirTitularYBajada, sugerirCarrusel, sugerirGraficoLead, sugerirTextoConFoto } = require('../lib/sugerenciasIA');
+const { sugerirAngulos, sugerirCopy, sugerirTitularYBajada, sugerirCarrusel, sugerirGraficoLead, sugerirTextoConFoto } = require('../lib/sugerenciasIA');
 const { generarFondoImagen } = require('../lib/openaiImagenes');
 const { crearImagenPieza, crearTarjetaPersonal, crearCarrusel, crearGraficoLead, crearImagenConFoto, estiloFotoAleatorio } = require('../lib/imagenPieza');
 
@@ -338,8 +339,40 @@ router.post('/generar-semana', async (req, res, next) => {
     }
 
     const perfil = await getPerfilPorId(plan.perfil_producto_id);
+
+    // Primero se decide qué dice cada pieza (un ángulo distinto por pieza, sin importar el
+    // canal) y recién después se escribe cada copy. Antes todas se escribían en paralelo con
+    // el mismo prompt y salían casi iguales. Si falla este paso se corta: seguir sin ángulos
+    // sería volver a generar la semana repetida.
+    const evitar = await getCopysAEvitar({ planId: plan.id, semana: numero, pilar: pilar.pilar });
+    let angulos;
+    try {
+      angulos = await sugerirAngulos({
+        perfil,
+        objetivoPlan: plan.objetivo,
+        pilar,
+        piezas: tareas,
+        evitar,
+      });
+    } catch (err) {
+      return res.redirect(
+        `/productos/${req.producto.slug}/contenido?error=${encodeURIComponent('No se pudieron definir los ángulos de la semana: ' + err.message)}`
+      );
+    }
+    const textoAngulo = (a) => a.angulo;
+
     const resultados = await Promise.allSettled(
-      tareas.map((t) => sugerirCopy({ perfil, objetivoPlan: plan.objetivo, pilar, canal: t.canal }))
+      tareas.map((t, i) =>
+        sugerirCopy({
+          perfil,
+          objetivoPlan: plan.objetivo,
+          pilar,
+          canal: t.canal,
+          angulo: angulos[i],
+          angulosOtros: angulos.filter((_, j) => j !== i).map(textoAngulo),
+          evitar,
+        })
+      )
     );
 
     let fallos = 0;
@@ -348,9 +381,9 @@ router.post('/generar-semana', async (req, res, next) => {
       if (r.status === 'fulfilled') {
         await pool.query(
           `INSERT INTO contenido_generado
-            (plan_marketing_id, perfil_producto_id, semana, canal, formato, pilar, copy, estado)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, 'borrador')`,
-          [plan.id, plan.perfil_producto_id, numero, tareas[i].canal, tareas[i].formato, pilar.pilar, r.value]
+            (plan_marketing_id, perfil_producto_id, semana, canal, formato, pilar, copy, angulo, estado)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'borrador')`,
+          [plan.id, plan.perfil_producto_id, numero, tareas[i].canal, tareas[i].formato, pilar.pilar, r.value, angulos[i].angulo]
         );
       } else {
         fallos += 1;
@@ -463,11 +496,24 @@ router.post('/pieza/:id/regenerar', async (req, res, next) => {
       cta: '',
     };
 
+    // Mantiene el ángulo que ya tenía la pieza (si lo tiene) y le pasa lo que dicen las
+    // otras piezas + su propio copy actual, para que "regenerar" dé otra redacción real y
+    // no una variante de lo mismo ni algo que pise a otra pieza de la semana.
+    const evitar = await getCopysAEvitar({
+      planId: plan.id,
+      semana: pieza.semana,
+      pilar: pieza.pilar,
+      excluirId: pieza.id,
+    });
+    evitar.unshift({ semana: pieza.semana, canal: pieza.canal, angulo: '', copy: (pieza.copy || '').replace(/\s+/g, ' ').trim().slice(0, 280) });
+
     const nuevoCopy = await sugerirCopy({
       perfil,
       objetivoPlan: plan.objetivo,
       pilar: pilarObj,
       canal: pieza.canal,
+      angulo: pieza.angulo ? { angulo: pieza.angulo } : null,
+      evitar,
     });
 
     await pool.query(

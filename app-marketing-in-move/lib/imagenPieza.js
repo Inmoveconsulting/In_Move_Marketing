@@ -838,8 +838,13 @@ async function crearImagenConFoto({ estilo, datos, fotoDataUri, logoDataUri, aut
   const conAutor = !!(autorFotoDataUri && autorNombre);
   const g = geometriaGrafico(w, h);
   const fotoBuffer = Buffer.from(fotoDataUri.split(',')[1], 'base64');
-  // Arriba: en fotos de personas la cabeza queda en el tercio superior, no se recorta.
-  const opcionesCover = { fit: 'cover', position: 'north' };
+  // Fotos verticales: se ancla arriba (la cabeza queda en el tercio superior, no se
+  // recorta). Fotos horizontales (ej. deportistas, escenas amplias) que hay que recortar a
+  // cuadrado o vertical: recorte inteligente, que busca la zona con más detalle/contraste
+  // (la persona) en vez de quedarse con el centro.
+  const metaFoto = await sharp(fotoBuffer).rotate().metadata();
+  const horizontal = (metaFoto.width || 0) > (metaFoto.height || 0) * 1.1;
+  const opcionesCover = { fit: 'cover', position: horizontal ? sharp.strategy.attention : 'north' };
   const params = { datos, ancho: w, alto: h, conLogo: !!logoDataUri, conAutor, autorNombre, autorCargo };
   const capasFinales = await logoYFirmaComposicion({ g, logoDataUri, autorFotoDataUri, conAutor });
 

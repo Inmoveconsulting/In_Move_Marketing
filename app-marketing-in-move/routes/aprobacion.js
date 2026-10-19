@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router({ mergeParams: true });
 const pool = require('../db/pool');
-const { getProducto, getPerfilPorId } = require('../lib/queries');
+const { getProducto, getPerfilPorId, getCopysAEvitar } = require('../lib/queries');
 const { sugerirCopy, sugerirCopyLinkedin } = require('../lib/sugerenciasIA');
 
 // Pantalla 4 — Cola de aprobación (gate central de la spec). Junta piezas de Contenido
@@ -157,12 +157,20 @@ router.post('/pieza/:origen/:id/pedir-cambios', async (req, res, next) => {
         cta: '',
       };
 
+      const evitar = await getCopysAEvitar({
+        planId: plan.id,
+        semana: pieza.semana,
+        pilar: pieza.pilar,
+        excluirId: pieza.id,
+      });
       const nuevoCopy = await sugerirCopy({
         perfil,
         objetivoPlan: plan.objetivo,
         pilar: pilarObj,
         canal: pieza.canal,
         feedbackPrevio: feedback,
+        angulo: pieza.angulo ? { angulo: pieza.angulo } : null,
+        evitar,
       });
       await pool.query(
         `UPDATE contenido_generado SET

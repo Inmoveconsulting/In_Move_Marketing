@@ -136,12 +136,69 @@ oraciones cortas, no más) para que la respuesta no se corte, y no agregues camp
   return extractJson(text, { stopReason });
 }
 
+// Lista de lo ya escrito que una pieza nueva no debe repetir (otras piezas de la semana +
+// semanas anteriores del mismo pilar). Lo usan tanto sugerirAngulos como sugerirCopy.
+function bloqueYaDicho(evitar) {
+  if (!evitar || evitar.length === 0) return '';
+  const lineas = evitar
+    .map((e) => `- [${e.canal}, semana ${e.semana}${e.angulo ? ', ángulo: ' + e.angulo : ''}] "${e.copy}"`)
+    .join('\n');
+  return `\nYA SE PUBLICÓ O YA SE ESCRIBIÓ ESTO (no repitas su arranque, su idea central, su ejemplo ni su estructura):\n${lineas}\n`;
+}
+
+// Antes de escribir los copys de una semana, se decide UNA VEZ qué dice cada pieza. Si cada
+// pieza se escribe por separado con el mismo pilar, todas convergen en el mismo gancho, el
+// mismo ejemplo y la misma estructura (pasaba: 7 piezas, todas "Es tu mejor vendedor...").
+// Acá se reparte el pilar en ángulos distintos, uno por pieza, sin importar el canal.
+async function sugerirAngulos({ perfil, objetivoPlan, pilar, piezas, evitar }) {
+  const lista = piezas
+    .map((p, i) => `${i + 1}. ${p.canal}${p.formato ? ' ' + p.formato : ''}`)
+    .join('\n');
+
+  const prompt = `
+${resumenPerfil(perfil)}
+
+OBJETIVO DE ESTE PLAN DE MARKETING:
+${objetivoPlan}
+
+PILAR DE LA SEMANA: ${pilar.pilar}
+${pilar.descripcion}
+${bloqueYaDicho(evitar)}
+PIEZAS DE ESTA SEMANA (cada una va a ser un posteo distinto):
+${lista}
+
+Tarea: este pilar es el tema de toda la semana, pero las ${piezas.length} piezas NO pueden decir lo mismo. Quien siga las cuentas va a ver todas en pocos días: si cada una repite la idea, el gancho o el ejemplo, la semana parece una sola pieza copiada. Repartí el pilar en ${piezas.length} ángulos realmente distintos, uno por pieza, en el mismo orden de la lista.
+
+Reglas:
+- Cada ángulo es una faceta propia del pilar (una tensión, un error común, una pregunta que conviene hacerse, un criterio concreto, una consecuencia, un malentendido). No son dos formas de contar lo mismo.
+- No importa el canal: dos piezas de redes distintas tampoco pueden compartir ángulo ni ejemplo.
+- Variá el tipo de apertura entre piezas (pregunta, dato o afirmación incómoda, escena concreta, mito a desarmar, contraste, lista corta). Ninguna apertura igual a otra ni a las ya escritas.
+- Variá el escenario. No te quedes con un solo rol, área o industria como protagonista de todos (por ejemplo, no pongas a un vendedor en todas): el pilar aplica a cualquier tipo de puesto y organización. Si el pilar es general, alterná escenarios distintos o dejalo sin escenario concreto.
+- Adaptá el ángulo al canal: LinkedIn admite más desarrollo, Instagram algo más emocional y directo, Email más de conversación 1 a 1.
+
+Respondé con este JSON exacto, sin nada más alrededor y sin campos extra. Sé breve en cada campo (una oración):
+{
+  "angulos": [
+    {"angulo": "<qué punto puntual cubre esta pieza>", "apertura": "<tipo de apertura que usa>", "escenario": "<rol/situación en la que se apoya, o 'general'>"}
+  ]
+}
+`.trim();
+
+  const { text, stopReason } = await askClaude({ system: SYSTEM, prompt, maxTokens: 1500 });
+  const data = extractJson(text, { stopReason });
+  const angulos = Array.isArray(data) ? data : data.angulos;
+  if (!Array.isArray(angulos) || angulos.length < piezas.length) {
+    throw new Error('La IA no devolvió un ángulo por cada pieza de la semana.');
+  }
+  return angulos.slice(0, piezas.length);
+}
+
 // Pantalla 3 — genera el copy de una pieza puntual, usando el perfil + la fila del
 // calendario (pilar) correspondiente + el canal, como pide la spec. Un texto plano, no
 // JSON — no hay estructura que parsear, solo el copy final. feedbackPrevio (opcional):
 // cuando viene de "pedir cambios" en la Cola de aprobación (Pantalla 4), se incorpora el
 // pedido puntual en vez de regenerar a ciegas.
-async function sugerirCopy({ perfil, objetivoPlan, pilar, canal, feedbackPrevio }) {
+async function sugerirCopy({ perfil, objetivoPlan, pilar, canal, feedbackPrevio, angulo, angulosOtros, evitar }) {
   const system =
     'Sos un copywriter B2B experto. Escribís en español, siguiendo el tono de voz y las frases guía de la marca que se te dan. Respondés ÚNICAMENTE con el texto final del copy — sin explicaciones, sin comillas, sin encabezados, sin markdown.';
 
@@ -160,7 +217,20 @@ ${pilar.descripcion}
 CTA A USAR: ${pilar.cta}
 
 CANAL: ${canal}
-
+${
+  angulo && angulo.angulo
+    ? `
+ÁNGULO ASIGNADO A ESTA PIEZA (es lo que la distingue de las otras piezas de la semana — desarrollá ESTE punto y no el pilar en general):
+- Punto a cubrir: ${angulo.angulo}
+- Cómo abrir: ${angulo.apertura || 'a tu criterio, distinto a lo ya escrito'}
+- Escenario: ${angulo.escenario || 'general'}
+${
+  angulosOtros && angulosOtros.length
+    ? '- Las otras piezas de la semana ya cubren esto (no lo toques):\n' + angulosOtros.map((a) => '  · ' + a).join('\n') + '\n'
+    : ''
+}`
+    : ''
+}${bloqueYaDicho(evitar)}
 Tarea: escribí el copy de esta pieza para el canal de arriba, siguiendo el tono de voz y
 las reglas de la marca. Adaptá longitud y formato a las convenciones del canal:
 - LinkedIn: puede ser más largo (hasta ~1200 caracteres), con saltos de línea cortos para
@@ -168,6 +238,8 @@ las reglas de la marca. Adaptá longitud y formato a las convenciones del canal:
 - Instagram: más corto y directo, más visual/emocional, sin sonar corporativo.
 - Email: escribí primero una línea "Asunto: ..." y después el cuerpo del mensaje.
 - Otro canal: usá tu criterio según sus convenciones habituales.
+
+No des por hecho que el público objetivo es un solo tipo de puesto (por ejemplo, vendedores): salvo que el ángulo asignado pida un escenario concreto, hablá de forma que sirva para cualquier posición. No arranques con la misma frase ni la misma estructura que lo ya escrito.
 
 Si el CTA de arriba no es "sin CTA duro", cerrá el copy con ese llamado a la acción de
 forma natural, no pegado como una fórmula. Si es "sin CTA duro", el cierre puede invitar a
@@ -513,6 +585,7 @@ module.exports = {
   sugerirDuracion,
   sugerirCanales,
   sugerirCalendario,
+  sugerirAngulos,
   sugerirCopy,
   sugerirTitularYBajada,
   sugerirCarrusel,

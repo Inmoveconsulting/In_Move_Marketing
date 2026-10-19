@@ -160,6 +160,7 @@ ALTER TABLE contenido_generado ADD COLUMN IF NOT EXISTS bajada_imagen TEXT DEFAU
 ALTER TABLE contenido_generado ADD COLUMN IF NOT EXISTS programado_en TIMESTAMPTZ;
 ALTER TABLE contenido_generado ADD COLUMN IF NOT EXISTS metricool_post_id TEXT;
 ALTER TABLE contenido_generado ADD COLUMN IF NOT EXISTS formato TEXT DEFAULT '';
+ALTER TABLE contenido_generado ADD COLUMN IF NOT EXISTS angulo TEXT DEFAULT ''; -- enfoque puntual de esta pieza dentro del pilar de la semana (lo define sugerirAngulos); sirve para que las piezas de una semana no digan todas lo mismo y para regenerar sin pisarse con las demas
 ALTER TABLE contenido_generado ADD COLUMN IF NOT EXISTS imagenes_carrusel JSONB DEFAULT '[]';
 ALTER TABLE contenido_generado ADD COLUMN IF NOT EXISTS usa_video BOOLEAN NOT NULL DEFAULT false;
 
